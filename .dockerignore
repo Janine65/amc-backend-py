@@ -1,0 +1,10 @@
+.env*
+.git/
+.gitignore
+.DS_Store
+.vscode/
+.github/
+.pytest_cache/
+.ruff_cache/
+.venv/
+__pycache__/
