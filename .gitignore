@@ -162,5 +162,5 @@ cython_debug/
 .log*/
 ./public/uploads/*.pdf
 ./public/exports/*.pdf
-.DS_Store/
+.DS_Store
 documents/*.pdf
