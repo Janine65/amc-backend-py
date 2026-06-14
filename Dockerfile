@@ -33,4 +33,4 @@ COPY --from=builder /root/.local /root/.local
 COPY . .
 
 EXPOSE 3001
-CMD ["uvicorn", "app.main:app"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "3001"]
