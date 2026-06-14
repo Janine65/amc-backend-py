@@ -163,3 +163,4 @@ cython_debug/
 ./public/uploads/*.pdf
 ./public/exports/*.pdf
 .DS_Store/
+documents/*.pdf
