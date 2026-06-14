@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+# Pre-Push-Hook: bumpt PACKAGE_VERSION (Patch) in app/core/config.py
+# bei jedem Push auf 'main' und pusht den Bump-Commit gleich mit.
+#
+# Loop-Schutz: der eigene Push erfolgt mit --no-verify, sodass dieser Hook
+# beim Bump-Push NICHT erneut feuert.
+
+set -euo pipefail
+
+remote="$1"
+TARGET_BRANCH="main"
+CONFIG_FILE="app/core/config.py"
+
+repo_root=$(git rev-parse --show-toplevel)
+cd "$repo_root"
+
+push_main=0
+while read -r local_ref local_sha remote_ref remote_sha; do
+    [ -z "${remote_ref:-}" ] && continue
+    if [ "$remote_ref" = "refs/heads/${TARGET_BRANCH}" ]; then
+        # Gelöschter Branch ($local_sha = 0000…) → kein Bump
+        if [ "$local_sha" != "0000000000000000000000000000000000000000" ]; then
+            push_main=1
+        fi
+    fi
+done
+
+if [ "$push_main" -ne 1 ]; then
+    exit 0
+fi
+
+current_branch=$(git rev-parse --abbrev-ref HEAD)
+if [ "$current_branch" != "$TARGET_BRANCH" ]; then
+    echo "[pre-push] Skip: HEAD ist '$current_branch', nicht '$TARGET_BRANCH'." >&2
+    exit 0
+fi
+
+last_msg=$(git log -1 --pretty=%B)
+if printf '%s' "$last_msg" | grep -q '\[skip-bump\]'; then
+    echo "[pre-push] Letzter Commit enthält [skip-bump] → kein Bump." >&2
+    exit 0
+fi
+
+if [ ! -f "$CONFIG_FILE" ]; then
+    echo "[pre-push] $CONFIG_FILE nicht gefunden – Bump übersprungen." >&2
+    exit 0
+fi
+
+# Working tree muss sauber sein (außer in $CONFIG_FILE), sonst lehnen wir ab.
+if ! git diff --quiet -- . ":(exclude)$CONFIG_FILE" \
+   || ! git diff --cached --quiet -- . ":(exclude)$CONFIG_FILE"; then
+    echo "[pre-push] Working tree hat unbestätigte Änderungen außerhalb von $CONFIG_FILE." >&2
+    echo "[pre-push] Bitte zuerst committen oder stashen, dann erneut pushen." >&2
+    exit 1
+fi
+
+PYTHON_BIN="${PYTHON:-python3}"
+if [ -x ".venv/bin/python" ]; then
+    PYTHON_BIN=".venv/bin/python"
+fi
+
+bump_output=$(
+    CONFIG_FILE="$CONFIG_FILE" "$PYTHON_BIN" - <<'PY'
+import os
+import pathlib
+import re
+import sys
+
+path = pathlib.Path(os.environ["CONFIG_FILE"])
+src = path.read_text(encoding="utf-8")
+pat = re.compile(r'^(PACKAGE_VERSION\s*=\s*")(\d+)\.(\d+)\.(\d+)(")', re.M)
+m = pat.search(src)
+if not m:
+    sys.stderr.write("PACKAGE_VERSION nicht gefunden\n")
+    sys.exit(2)
+major, minor, patch = int(m[2]), int(m[3]), int(m[4])
+new_version = f"{major}.{minor}.{patch + 1}"
+old_version = f"{major}.{minor}.{patch}"
+new_src = pat.sub(rf'\g<1>{new_version}\5', src, count=1)
+path.write_text(new_src, encoding="utf-8")
+print(f"{old_version} {new_version}")
+PY
+)
+
+old_version=$(echo "$bump_output" | awk '{print $1}')
+new_version=$(echo "$bump_output" | awk '{print $2}')
+
+echo "[pre-push] PACKAGE_VERSION: $old_version → $new_version" >&2
+
+git add -- "$CONFIG_FILE"
+git commit -m "chore: bump version ${old_version} -> ${new_version} [skip-bump]" \
+    --no-verify >/dev/null
+
+echo "[pre-push] Pushe Bump-Commit (mit --no-verify) nach ${remote}/${TARGET_BRANCH}…" >&2
+git push --no-verify "$remote" "HEAD:refs/heads/${TARGET_BRANCH}"
+
+# Den ursprünglichen Push abbrechen – die neuen Commits sind bereits gepusht.
+echo "[pre-push] Originaler Push wird abgebrochen (Bump-Push enthält bereits alles)." >&2
+exit 1

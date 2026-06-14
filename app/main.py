@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from importlib.metadata import distributions
 
 import secure
 from fastapi import FastAPI, Request
@@ -18,6 +19,7 @@ from slowapi.util import get_remote_address
 
 from app.core.config import (
     PACKAGE_AUTHOR,
+    PACKAGE_DESCRIPTION,
     PACKAGE_NAME,
     PACKAGE_VERSION,
     get_config,
@@ -113,12 +115,7 @@ secure_headers = secure.Secure(
     csp=_csp,
     hsts=secure.StrictTransportSecurity().max_age(31536000),
     referrer=secure.ReferrerPolicy().strict_origin_when_cross_origin(),
-    permissions=(
-        secure.PermissionsPolicy()
-        .geolocation()
-        .microphone()
-        .camera()
-    ),
+    permissions=(secure.PermissionsPolicy().geolocation().microphone().camera()),
     xfo=secure.XFrameOptions().sameorigin(),
     xcto=secure.XContentTypeOptions(),
     coop=secure.CrossOriginOpenerPolicy().same_origin(),
@@ -163,6 +160,17 @@ app.include_router(files_router.router)
 # ---------------------------------------------------------------------------
 
 
+def _collect_installed_packages() -> dict[str, str]:
+    """Return a sorted mapping of installed distribution names to versions."""
+    packages: dict[str, str] = {}
+    for dist in distributions():
+        name = dist.metadata["Name"]
+        if not name:
+            continue
+        packages[name] = dist.version
+    return dict(sorted(packages.items(), key=lambda item: item[0].lower()))
+
+
 @app.get("/about", tags=["meta"])
 async def about() -> JSONResponse:
     return JSONResponse(
@@ -170,6 +178,8 @@ async def about() -> JSONResponse:
             "name": PACKAGE_NAME,
             "version": PACKAGE_VERSION,
             "author": PACKAGE_AUTHOR,
+            "description": PACKAGE_DESCRIPTION,
+            "dependencies": _collect_installed_packages(),
         }
     )
 
