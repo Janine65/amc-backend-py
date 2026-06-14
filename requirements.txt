@@ -1,0 +1,45 @@
+# Web Framework
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+
+# Validation / settings
+pydantic==2.10.3
+pydantic-settings==2.7.0
+email-validator==2.2.0
+
+# ORM (SQLAlchemy 2.0 async + asyncpg) and migrations
+SQLAlchemy[asyncio]==2.0.36
+asyncpg==0.30.0
+alembic==1.13.3
+greenlet==3.1.1
+
+# Auth / Security
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.2.0
+
+# File uploads (multipart) and helmet equivalents
+python-multipart==0.0.20
+secure==1.0.1
+slowapi==0.1.9
+
+# Excel / PDF / Swiss QR Bill
+openpyxl==3.1.5
+reportlab==4.4.3
+qrbill==1.0.0
+# svglib<1.6 vermeidet die rlpycairo/pycairo-Abhängigkeit (Cairo + pkg-config nötig).
+svglib==1.5.1
+Pillow==10.4.0
+
+# Email
+fastapi-mail==1.4.2
+aiosmtplib==3.0.2
+certifi>=2024.7.4
+
+# .env loading
+python-dotenv==1.0.1
+
+# Misc
+itsdangerous==2.2.0
+httpx==0.27.2
+

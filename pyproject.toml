@@ -1,0 +1,30 @@
+[project]
+name = "amc-backend-py"
+version = "1.0.0"
+description = "Backend for AMC Internal Application (Python / FastAPI port of amc-backend)"
+authors = [{ name = "Janine Franken", email = "janine@automoto-sr.info" }]
+readme = "README.md"
+license = { text = "UNLICENSED" }
+requires-python = ">=3.11"
+
+[project.urls]
+Homepage = "https://interna.automoto-sr.info"
+
+[project.optional-dependencies]
+dev = [
+    "ruff==0.15.17",
+    "pytest==8.3.4",
+    "pytest-asyncio==0.24.0",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["B008", "E501"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

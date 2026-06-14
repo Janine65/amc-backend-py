@@ -1,0 +1,53 @@
+{
+  "config": {
+    "development": {
+      "config_id": "development",
+      "app_name": "amc-administration",
+      "app_desc": "AMC Administration",
+      "node_port": 3002,
+      "host": "0.0.0.0",
+      "json_indentation": 4,
+      "dbhost": "localhost",
+      "webhost": "http://localhost:4201",
+      "database": "amcadmin",
+      "db_user": "postgres",
+      "port": 5436,
+      "dbtype": "postgresql+asyncpg",
+      "defaultEmail": "JanineFranken",
+      "userEmail": "Janine Franken",
+      "JanineFranken": {
+        "smtp": "smtp.zoho.com",
+        "smtp_port": 465,
+        "smtp_user": "janine@automoto-sr.info",
+        "smtp_pwd_env": "SMTP_PWD_JANINEFRANKEN",
+        "email_from": "Janine Franken <janine@automoto-sr.info>"
+      },
+      "HansjoergDutler": {
+        "smtp": "smtp.zoho.com",
+        "smtp_port": 465,
+        "smtp_user": "info@automoto-sr.info",
+        "smtp_pwd_env": "SMTP_PWD_HANSJOERGDUTLER",
+        "email_from": "AutoMotoClub Swissair <info@automoto-sr.info>"
+      }
+    },
+    "test": {
+      "node_port": 3001,
+      "config_id": "test",
+      "webhost": "http://localhost:4200",
+      "dbhost": "host.docker.internal",
+      "defaultEmail": "JanineFranken",
+      "userEmail": "Janine Franken"
+    },
+    "production": {
+      "config_id": "production",
+      "node_port": 3001,
+      "dbhost": "olconet",
+      "webhost": "https://interna.automoto-sr.info",
+      "database": "amcadmin",
+      "db_user": "postgres",
+      "port": 5439,
+      "host": "0.0.0.0",
+      "defaultEmail": "HansjoergDutler"
+    }
+  }
+}
