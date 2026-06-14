@@ -1,5 +1,5 @@
 # --- Stage 1: Build dependencies ---
-FROM python:3.11-slim-bookworm AS builder
+FROM python:3.12-slim-bookworm AS builder
 WORKDIR /usr/src/app
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -15,7 +15,7 @@ COPY requirements.txt .
 RUN pip install --user -r requirements.txt
 
 # --- Stage 2: Runtime ---
-FROM python:3.11-slim-bookworm AS runtime
+FROM python:3.12-slim-bookworm AS runtime
 WORKDIR /usr/src/app
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -33,4 +33,4 @@ COPY --from=builder /root/.local /root/.local
 COPY . .
 
 EXPOSE 3001
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "3001"]
+CMD ["uvicorn", "app.main:app"]

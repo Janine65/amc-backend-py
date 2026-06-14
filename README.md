@@ -1,6 +1,6 @@
 # amc-backend-py
 
-Python / FastAPI Port des `amc-backend` (NestJS / Prisma) für die AMC Internal Application.
+Python / FastAPI für die AMC Internal Application.
 
 ## Stack
 
@@ -20,14 +20,14 @@ konfiguriert (`autogenerate` ist deaktiviert; nur manuelle Revisionen).
 ```bash
 python3.11 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 cp .env.example .env  # Werte ausfüllen
 ```
 
 ## Starten
 
 ```bash
-uvicorn app.main:app --host 0.0.0.0 --port 3002 --reload
+uvicorn app.main:app --reload
 ```
 
 Swagger UI: <http://localhost:3002/api>
@@ -49,6 +49,7 @@ app/
   main.py           # App-Bootstrap, Middleware, Swagger
 config.json         # 1:1 aus amc-backend übernommen
 alembic/            # Migrationen
+tests/              # Verschieden Tests für Routen
 ```
 
 ## Endpunkte
