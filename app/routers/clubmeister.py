@@ -54,10 +54,8 @@ async def overview(db: Annotated[AsyncSession, Depends(get_db)]) -> RetData[list
     )
 
 
-@router.get("/calcMeister", response_model=RetData[list[ClubmeisterCreate]])
-async def calc_meister(
-    jahr: str, _: CurrentUser, db: Annotated[AsyncSession, Depends(get_db)]
-) -> RetData[list[ClubmeisterCreate]]:
+@router.get("/calcmeister", response_model=RetData[list[ClubmeisterCreate]])
+async def calc_meister(jahr: str, db: Annotated[AsyncSession, Depends(get_db)]) -> RetData[list[ClubmeisterCreate]]:
     """Recalculate club meister ranking (port of ``calcMeister``)."""
     start = date(int(jahr), 1, 1)
     end = date(int(jahr), 12, 31)

@@ -18,9 +18,8 @@ from app.models.adressen import Adressen
 from app.models.anlaesse import Anlaesse
 from app.models.clubmeister import Clubmeister
 from app.models.kegelmeister import Kegelmeister
-from app.models.meisterschaft import Meisterschaft
+from app.models.meisterschaft import MeisterAdresse, Meisterschaft
 from app.schemas.meisterschaft import (
-    MeisterEntity,
     MeisterschaftCreate,
     MeisterschaftEntity,
     MeisterschaftUpdate,
@@ -76,10 +75,10 @@ async def list_mitglied(
     )
 
 
-@router.get("/listmitgliedmeister", response_model=RetData[list[MeisterEntity]])
+@router.get("/listmitgliedmeister", response_model=RetData[list[MeisterAdresse]])
 async def list_mitglied_meister(
     mitgliedid: int, _: CurrentUser, db: Annotated[AsyncSession, Depends(get_db)]
-) -> RetData[list[MeisterEntity]]:
+) -> RetData[list[MeisterAdresse]]:
     adresse = await db.scalar(
         select(Adressen)
         .where(Adressen.id == mitgliedid)
@@ -101,51 +100,50 @@ async def list_mitglied_meister(
         .all()
     )
 
-    al: list[MeisterEntity] = []
+    al: list[MeisterAdresse] = []
     for cm in sorted(adresse.clubmeister, key=lambda c: c.jahr, reverse=True):
         diff = None
         first = next((c for c in cm_first if c.jahr == cm.jahr), None)
         if first:
             diff = (first.punkte or 0) - (cm.punkte or 0)
         al.append(
-            MeisterEntity(
-                jahr=cm.jahr,
-                rang=cm.rang,
-                vorname=cm.vorname,
-                nachname=cm.nachname,
-                mitgliedid=cm.mitgliedid,
-                clubpunkte=cm.punkte,
-                anlaesse=cm.anlaesse,
-                werbungen=cm.werbungen,
-                mitglieddauer=cm.mitglieddauer,
-                diff_first=diff,
+            MeisterAdresse(
+                jahr=int(cm.jahr),
+                rangC=cm.rang,
+                punkteC=cm.punkte,
+                anlaesseC=cm.anlaesse,
+                werbungenC=cm.werbungen,
+                mitglieddauerC=cm.mitglieddauer,
+                diffErsterC=diff,
+                statusC=cm.status,
             )
         )
     for km in sorted(adresse.kegelmeister, key=lambda k: k.jahr, reverse=True):
-        existing = next((m for m in al if m.jahr == km.jahr), None)
+        existing = next((m for m in al if m.jahr == int(km.jahr)), None)
         diff = None
         first = next((k for k in km_first if k.jahr == km.jahr), None)
         if first:
             diff = (first.punkte or 0) - (km.punkte or 0)
         if existing is None:
             al.append(
-                MeisterEntity(
-                    jahr=km.jahr,
-                    rang=km.rang,
-                    vorname=km.vorname,
-                    nachname=km.nachname,
-                    mitgliedid=km.mitgliedid,
-                    kegelpunkte=km.punkte,
-                    anlaesse=km.anlaesse,
-                    babeli=km.babeli,
-                    diff_first=diff,
+                MeisterAdresse(
+                    jahr=int(km.jahr),
+                    rangK=km.rang,
+                    punkteK=km.punkte,
+                    anlaesseK=km.anlaesse,
+                    babeliK=km.babeli,
+                    diffErsterK=diff,
+                    statusK=km.status,
                 )
             )
+
         else:
-            existing.kegelpunkte = km.punkte
-            existing.babeli = km.babeli
-            if diff is not None and existing.diff_first is None:
-                existing.diff_first = diff
+            existing.rangK = km.rang
+            existing.punkteK = km.punkte
+            existing.anlaesseK = km.anlaesse
+            existing.babeliK = km.babeli
+            existing.diffErsterK = diff
+            existing.statusK = km.status
 
     return RetData(data=al, message="Liste der Meisterschaften für Mitglied")
 

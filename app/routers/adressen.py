@@ -98,7 +98,7 @@ async def export_adressen(adressen: list[AdressenEntity], _: CurrentUser) -> Ret
     fmt_today = date_cls.today().strftime("%d.%m.%Y")
 
     wb = Workbook()
-    sheet = wb.active
+    sheet = wb.active or wb.create_sheet(title="Adressen")
     sheet.title = "Adressen"
 
     title_font = Font(name="Tahoma", size=I_FONT_SIZE_TITEL, bold=True)

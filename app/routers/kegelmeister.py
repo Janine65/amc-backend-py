@@ -55,7 +55,7 @@ async def overview(db: Annotated[AsyncSession, Depends(get_db)]) -> RetData[list
     )
 
 
-@router.get("/calcMeister", response_model=RetData[list[KegelmeisterCreate]])
+@router.get("/calcmeister", response_model=RetData[list[KegelmeisterCreate]])
 async def calc_meister(
     jahr: str, _: CurrentUser, db: Annotated[AsyncSession, Depends(get_db)]
 ) -> RetData[list[KegelmeisterCreate]]:

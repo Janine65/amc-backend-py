@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING
 
+from pydantic import BaseModel
 from sqlalchemy import Boolean, ForeignKey, Integer, SmallInteger, UniqueConstraint
 from sqlalchemy.dialects.postgresql import TIMESTAMP
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -37,3 +38,20 @@ class Meisterschaft(Base):
 
     anlaesse: Mapped[Anlaesse] = relationship("Anlaesse", back_populates="meisterschaft", lazy="selectin", join_depth=1)
     adressen: Mapped[Adressen] = relationship("Adressen", back_populates="meisterschaft", lazy="selectin", join_depth=1)
+
+
+class MeisterAdresse(BaseModel):
+    jahr: int
+    rangC: int | None = None
+    punkteC: int | None = None
+    anlaesseC: int | None = None
+    werbungenC: int | None = None
+    mitglieddauerC: int | None = None
+    statusC: int | None = 0
+    diffErsterC: int | None = None
+    rangK: int | None = None
+    punkteK: int | None = None
+    anlaesseK: int | None = None
+    babeliK: int | None = None
+    statusK: int | None = 0
+    diffErsterK: int | None = None
