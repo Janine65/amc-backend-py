@@ -52,11 +52,15 @@ async def get_overview(db: Annotated[AsyncSession, Depends(get_db)]) -> RetData[
     from_d = date(int(year), 1, 1)
     to_d = date(int(year) + 1, 1, 1)
     total = await db.scalar(
-        select(func.count(Anlaesse.id)).where(and_(Anlaesse.datum >= from_d, Anlaesse.datum < to_d))
+        select(func.count(Anlaesse.id)).where(
+            and_(Anlaesse.datum >= from_d, Anlaesse.datum < to_d, Anlaesse.nachkegeln.is_(False))
+        )
     )
     today = datetime.now(UTC).date()
     upcoming = await db.scalar(
-        select(func.count(Anlaesse.id)).where(and_(Anlaesse.datum > today, Anlaesse.datum < to_d))
+        select(func.count(Anlaesse.id)).where(
+            and_(Anlaesse.datum > today, Anlaesse.datum < to_d, Anlaesse.nachkegeln.is_(False))
+        )
     )
     return RetData(
         data=[
@@ -302,26 +306,27 @@ async def _fill_template(db: AsyncSession, sheet: Worksheet, adr_id: int, syear:
 
     for sheet_row in sheet.iter_rows():
         for cell in sheet_row:
-            if cell.column_letter == "K" and cell.value not in (None, "", "eventid"):
+            if cell.column == 11 and cell.value not in (None, "", "eventid"):
                 for m in rows:
                     if cell.value == m.eventid:
-                        sheet.cell(row=cell.row, column=1).value = m.punkte
+                        row_num = int(cell.row) if cell.row else 0
+                        sheet.cell(row=row_num, column=1, value=m.punkte)
                         club_total += m.punkte or 0
                         any_wurf = any((m.wurf1, m.wurf2, m.wurf3, m.wurf4, m.wurf5))
                         if any_wurf:
                             kegel_summe = sum(
                                 int(x or 0) for x in (m.wurf1, m.wurf2, m.wurf3, m.wurf4, m.wurf5, m.zusatz)
                             )
-                            sheet.cell(row=cell.row, column=3).value = m.wurf1
-                            sheet.cell(row=cell.row, column=4).value = m.wurf2
-                            sheet.cell(row=cell.row, column=5).value = m.wurf3
-                            sheet.cell(row=cell.row, column=6).value = m.wurf4
-                            sheet.cell(row=cell.row, column=7).value = m.wurf5
-                            sheet.cell(row=cell.row, column=9).value = kegel_summe
+                            sheet.cell(row=row_num, column=3, value=m.wurf1)
+                            sheet.cell(row=row_num, column=4, value=m.wurf2)
+                            sheet.cell(row=row_num, column=5, value=m.wurf3)
+                            sheet.cell(row=row_num, column=6, value=m.wurf4)
+                            sheet.cell(row=row_num, column=7, value=m.wurf5)
+                            sheet.cell(row=row_num, column=9, value=kegel_summe)
                             if not (m.streichresultat or False):
                                 kegel_total += kegel_summe
                             else:
-                                for c in sheet[cell.row]:
+                                for c in sheet[row_num]:
                                     c.border = Border(
                                         top=diag_side,
                                         bottom=diag_side,
@@ -335,9 +340,9 @@ async def _fill_template(db: AsyncSession, sheet: Worksheet, adr_id: int, syear:
 
     for r in range(S_FIRST_ROW, sheet.max_row + 1):
         if sheet.cell(row=r, column=6).value == "Total Kegeln":
-            sheet.cell(row=r, column=9).value = kegel_total
+            sheet.cell(row=r, column=9, value=kegel_total)
         elif sheet.cell(row=r, column=2).value == "Total Club":
-            sheet.cell(row=r, column=1).value = club_total
+            sheet.cell(row=r, column=1, value=club_total)
 
 
 @router.get("/writestammblatt", response_model=RetDataFile)
@@ -350,7 +355,8 @@ async def write_stammblatt(
 ) -> RetDataFile:
     cfg = get_config()
     workbook = Workbook()
-    workbook.remove(workbook.active)
+    if workbook.active is not None:
+        workbook.remove(workbook.active)
     if type == 0:
         sheet = workbook.create_sheet("Template")
         await _create_template(db, jahr, sheet, incl_points=False)

@@ -171,7 +171,8 @@ async def write_journal(
 
     # ---------- Excel ----------
     wb = Workbook()
-    wb.remove(wb.active)
+    if wb.active is not None:
+        wb.remove(wb.active)
     sheet = wb.create_sheet("Journal")
 
     set_cell_value_format(

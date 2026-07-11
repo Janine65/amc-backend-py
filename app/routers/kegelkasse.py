@@ -97,7 +97,8 @@ async def gen_receipt(
 
     # ---------- Excel ----------
     wb = Workbook()
-    wb.remove(wb.active)
+    if wb.active is not None:
+        wb.remove(wb.active)
     sheet = wb.create_sheet("Kegelkasse")
     for col in ("A", "B", "C"):
         sheet.column_dimensions[col].width = 17

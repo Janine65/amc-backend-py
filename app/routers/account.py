@@ -174,7 +174,8 @@ async def write_kontoauszug(
 ) -> RetDataFile:
     cfg = get_config()
     wb = Workbook()
-    wb.remove(wb.active)
+    if wb.active is not None:
+        wb.remove(wb.active)
     accounts = await _get_account_jahr(db, year, 1 if all else 0)
 
     for acc in accounts:
