@@ -13,15 +13,7 @@
       "jinja": true,
       "justMyCode": false,
       "envFile": "${workspaceFolder}/.env",
-      "console": "integratedTerminal"
-    },
-    {
-      "name": "Python-Debugger: Modul (autoReload)",
-      "type": "debugpy",
-      "request": "launch",
-      "module": "app.main",
-      "autoReload": { "enable": true },
-      "envFile": "${workspaceFolder}/.env",
+      "env": { "NODE_ENV": "Development" },
       "console": "integratedTerminal"
     }
   ]

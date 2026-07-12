@@ -59,3 +59,6 @@ class KegelkasseEntity(KegelkasseBase):
     updatedAt: datetime | None = None
     journal: JournalEntity | None = None
     user: UserEntity | None = None
+    userName: str | None = None
+    cntUsers: int | None = None
+    amountProUser: float | None = None

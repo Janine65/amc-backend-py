@@ -16,7 +16,7 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
-from sqlalchemy import and_, select
+from sqlalchemy import and_, case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -24,8 +24,10 @@ from app.core.config import get_config
 from app.core.database import get_db
 from app.core.logging import get_logger
 from app.dependencies import CurrentUser
+from app.models.anlaesse import Anlaesse
 from app.models.journal_receipt import JournalReceipt
 from app.models.kegelkasse import Kegelkasse
+from app.models.meisterschaft import Meisterschaft
 from app.models.receipt import Receipt
 from app.schemas.kegelkasse import KegelkasseCreate, KegelkasseEntity, KegelkasseUpdate
 from app.schemas.ret_data import RetData, RetDataFile, RetDataFilePayload
@@ -65,18 +67,28 @@ async def kasse_by_jahr(
 ) -> RetData[list[KegelkasseEntity]]:
     start = date_cls(int(jahr), 1, 1)
     end = date_cls(int(jahr) + 1, 1, 1)
-    rows = (
-        (
-            await db.execute(
-                select(Kegelkasse)
-                .where(and_(Kegelkasse.datum >= start, Kegelkasse.datum < end))
-                .order_by(Kegelkasse.datum.asc())
-            )
-        )
-        .scalars()
-        .all()
+    cnt_users = func.count(Meisterschaft.id).label("cntUsers")
+    amount_pro_user = case(
+        (func.count(Meisterschaft.id) > 0, Kegelkasse.differenz / func.count(Meisterschaft.id)),
+        else_=0.0,
+    ).label("amountProUser")
+    result = await db.execute(
+        select(Kegelkasse, cnt_users, amount_pro_user)
+        .join(Anlaesse, Anlaesse.datum == Kegelkasse.datum, isouter=True)
+        .join(Meisterschaft, Meisterschaft.eventid == Anlaesse.id, isouter=True)
+        .where(and_(Kegelkasse.datum >= start, Kegelkasse.datum < end))
+        .group_by(Kegelkasse.id)
+        .order_by(Kegelkasse.datum.asc())
     )
-    return RetData(data=[KegelkasseEntity.model_validate(r) for r in rows], message="kasseByJahr")
+    data: list[KegelkasseEntity] = []
+    for kk, cnt, amount in result.all():
+        entity = KegelkasseEntity.model_validate(kk)
+        entity.cntUsers = int(cnt or 0)
+        entity.amountProUser = float(amount or 0.0)
+        if entity.user:
+            entity.userName = entity.user.name
+        data.append(entity)
+    return RetData(data=data, message="kasseByJahr")
 
 
 @router.get("/genreceipt", response_model=RetDataFile)
