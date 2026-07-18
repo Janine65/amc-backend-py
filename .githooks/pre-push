@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 # Pre-Push-Hook: bumpt PACKAGE_VERSION (Patch) in app/core/config.py
-# bei jedem Push auf 'main' und pusht den Bump-Commit gleich mit.
+# bei jedem Push auf 'main' und amendet den Bump in den letzten Commit.
 #
 # Loop-Schutz: der eigene Push erfolgt mit --no-verify, sodass dieser Hook
-# beim Bump-Push NICHT erneut feuert.
+# beim gepushten Bump NICHT erneut feuert.
+#
+# WICHTIG: --amend schreibt den letzten Commit um (neuer Hash). Das ist
+# unproblematisch, solange dieser Commit noch nicht auf dem Remote liegt.
+# Der Hook prüft das ab und lehnt sonst ab.
 
 set -euo pipefail
 
@@ -15,12 +19,14 @@ repo_root=$(git rev-parse --show-toplevel)
 cd "$repo_root"
 
 push_main=0
+remote_sha_main=""
 while read -r local_ref local_sha remote_ref remote_sha; do
     [ -z "${remote_ref:-}" ] && continue
     if [ "$remote_ref" = "refs/heads/${TARGET_BRANCH}" ]; then
         # Gelöschter Branch ($local_sha = 0000…) → kein Bump
         if [ "$local_sha" != "0000000000000000000000000000000000000000" ]; then
             push_main=1
+            remote_sha_main="$remote_sha"
         fi
     fi
 done
@@ -44,6 +50,16 @@ fi
 if [ ! -f "$CONFIG_FILE" ]; then
     echo "[pre-push] $CONFIG_FILE nicht gefunden – Bump übersprungen." >&2
     exit 0
+fi
+
+# HEAD darf noch nicht auf dem Remote sein, sonst würde --amend einen
+# bereits gepushten Commit umschreiben.
+zero_sha="0000000000000000000000000000000000000000"
+if [ -n "$remote_sha_main" ] && [ "$remote_sha_main" != "$zero_sha" ]; then
+    if git merge-base --is-ancestor HEAD "$remote_sha_main" 2>/dev/null; then
+        echo "[pre-push] HEAD ist bereits auf ${remote}/${TARGET_BRANCH} – kein Amend möglich." >&2
+        exit 1
+    fi
 fi
 
 # Working tree muss sauber sein (außer in $CONFIG_FILE), sonst lehnen wir ab.
@@ -88,12 +104,13 @@ new_version=$(echo "$bump_output" | awk '{print $2}')
 echo "[pre-push] PACKAGE_VERSION: $old_version → $new_version" >&2
 
 git add -- "$CONFIG_FILE"
-git commit -m "chore: bump version ${old_version} -> ${new_version} [skip-bump]" \
-    --no-verify >/dev/null
+# Bump in den letzten Commit einbauen statt einen separaten Commit anzulegen.
+git commit --amend --no-edit --no-verify >/dev/null
 
-echo "[pre-push] Pushe Bump-Commit (mit --no-verify) nach ${remote}/${TARGET_BRANCH}…" >&2
+echo "[pre-push] Pushe amendeten Commit (mit --no-verify) nach ${remote}/${TARGET_BRANCH}…" >&2
 git push --no-verify "$remote" "HEAD:refs/heads/${TARGET_BRANCH}"
 
-# Den ursprünglichen Push abbrechen – die neuen Commits sind bereits gepusht.
+# Den ursprünglichen Push abbrechen – der amendete Commit ist bereits gepusht
+# (und hätte durch den Hash-Wechsel ohnehin einen non-fast-forward-Fehler ausgelöst).
 echo "[pre-push] Originaler Push wird abgebrochen (Bump-Push enthält bereits alles)." >&2
 exit 1
