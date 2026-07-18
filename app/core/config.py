@@ -92,7 +92,7 @@ def _coerce_env(env_val: str, current: Any) -> Any:
 
 # Package metadata that mirrors NestJS' package.json reads
 PACKAGE_NAME = "amc-backend-py"
-PACKAGE_VERSION = "7.0.10"
+PACKAGE_VERSION = "7.0.11"
 PACKAGE_AUTHOR = "Janine Franken"
 PACKAGE_DESCRIPTION = "Backend for AMC Internal Application"
 PACKAGE_EMAIL = "janine@automoto-sr.info"
