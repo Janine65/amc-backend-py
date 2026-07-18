@@ -213,7 +213,8 @@ async def send_email(body: EmailBody, _: CurrentUser) -> RetData[dict]:
 async def create_qr_bill(id: int, _: CurrentUser, db: Annotated[AsyncSession, Depends(get_db)]) -> RetDataFile:
     cfg = get_config()
     params = await load_params()
-    jahr = params.get("CLUBJAHR", str(date_cls.today().year))
+    # jahr = params.get("CLUBJAHR", str(date_cls.today().year))
+    jahr = str(date_cls.today().year)
 
     adresse = await db.get(Adressen, id)
     if adresse is None:
@@ -233,7 +234,7 @@ async def create_qr_bill(id: int, _: CurrentUser, db: Annotated[AsyncSession, De
     }
     additional = f"Rechnungsnummer {jahr}0000{adresse.mnr}"
 
-    filename = f"AMC-Mitgliederbeitrag-{jahr}-{adresse.mnr}.pdf"
+    filename = f"AMC-Mitgliederbeitrag-{jahr}-{adresse.vorname}-{adresse.name}.pdf"
     Path(cfg.uploads).mkdir(parents=True, exist_ok=True)
     upload_path = cfg.uploads + filename
 
@@ -362,7 +363,7 @@ async def create_qr_bill(id: int, _: CurrentUser, db: Annotated[AsyncSession, De
         + (adresse.vorname or "")
         + "</p>"
         + "<p>"
-        + (params.get("RECHNUNG", "") or "").replace("\n", "</p><p>")
+        + (params.get("RECHNUNG", "") or "").replace("\n", "</p><p>").replace("{Jahr}", jahr)
         + "</p>"
         + "<p>Mit liebem Clubgruss</p><p>Janine Franken</p>"
     )
@@ -386,7 +387,7 @@ async def create_qr_bill(id: int, _: CurrentUser, db: Annotated[AsyncSession, De
     # Journal entry + receipt copy
     now = datetime.now(UTC)
     journal = Journal(
-        memo=f"Mitgliederbeitrag {jahr} von {debtor['name']}",
+        memo=f"{debtor['name']} - Mitgliederbeitrag {jahr}",
         date=today,
         year=today.year,
         amount=30,
