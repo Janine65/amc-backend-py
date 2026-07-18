@@ -18,6 +18,7 @@ from qrbill import QRBill
 from reportlab.graphics import renderPDF
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
+from reportlab.lib.utils import simpleSplit
 from reportlab.pdfgen import canvas
 from sqlalchemy import asc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -212,7 +213,7 @@ async def send_email(body: EmailBody, _: CurrentUser) -> RetData[dict]:
 @router.get("/qrbill", response_model=RetDataFile)
 async def create_qr_bill(id: int, _: CurrentUser, db: Annotated[AsyncSession, Depends(get_db)]) -> RetDataFile:
     cfg = get_config()
-    params = await load_params()
+    params = await load_params(True)
     # jahr = params.get("CLUBJAHR", str(date_cls.today().year))
     jahr = str(date_cls.today().year)
 
@@ -275,14 +276,19 @@ async def create_qr_bill(id: int, _: CurrentUser, db: Annotated[AsyncSession, De
     text_obj = pdf.beginText(20 * mm, A4[1] - 110 * mm)
     body_lines = [
         anrede + (adresse.vorname or ""),
-        params.get("RECHNUNG", ""),
-        "",
+        params.get("RECHNUNG", "").replace("{Jahr}", jahr) or "",
         "Mit liebem Clubgruss",
         "Janine Franken",
     ]
+    # Nutzbare Textbreite: A4 minus linker/rechter Rand (je 20 mm)
+    max_width = A4[0] - 40 * mm
     for line in body_lines:
         for sub in line.split("\n"):
-            text_obj.textLine(sub)
+            if not sub:
+                text_obj.textLine("")
+                continue
+            for wrapped in simpleSplit(sub, "Helvetica", 12, max_width):
+                text_obj.textLine(wrapped)
     pdf.drawText(text_obj)
 
     # TWINT
