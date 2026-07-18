@@ -31,7 +31,7 @@ async def create(
     obj = Parameter(**body.model_dump(), createdAt=datetime.now(UTC), updatedAt=datetime.now(UTC))
     db.add(obj)
     await db.flush()
-    await load_params()  # reload params to update the cache
+    await load_params(True)  # reload params to update the cache
     return RetData(data=ParameterEntity.model_validate(obj), message="Parameter created")
 
 
@@ -66,7 +66,7 @@ async def update(
         setattr(obj, k, v)
     obj.updatedAt = datetime.now(UTC)
     await db.flush()
-    await load_params()  # reload params to update the cache
+    await load_params(True)  # reload params to update the cache
     return RetData(data=ParameterEntity.model_validate(obj), message="Parameter updated")
 
 
@@ -80,5 +80,5 @@ async def remove(
     entity = ParameterEntity.model_validate(obj)
     await db.delete(obj)
     await db.flush()
-    await load_params()  # reload params to update the cache
+    await load_params(True)  # reload params to update the cache
     return RetData(data=entity, message="Parameter removed")

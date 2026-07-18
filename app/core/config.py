@@ -252,7 +252,7 @@ def get_config() -> Config:
     return cfg
 
 
-async def load_params() -> dict[str, str]:
+async def load_params(reload: bool = False) -> dict[str, str]:
     """Load the ``parameter`` table into ``Config.params``."""
     from sqlalchemy import select
 
@@ -260,9 +260,11 @@ async def load_params() -> dict[str, str]:
     from app.models.parameter import Parameter
 
     cfg = get_config()
-    if cfg.params:
+    if cfg.params and not reload:
         return cfg.params
     async with async_session_maker() as session:
+        logger.debug("Loading parameters from database...")
+        cfg.params.clear()
         result = await session.execute(select(Parameter))
         for param in result.scalars():
             cfg.params[param.key] = param.value
