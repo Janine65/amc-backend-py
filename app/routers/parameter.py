@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import load_params
 from app.core.database import get_db
 from app.core.logging import get_logger
 from app.dependencies import CurrentUser
@@ -30,6 +31,7 @@ async def create(
     obj = Parameter(**body.model_dump(), createdAt=datetime.now(UTC), updatedAt=datetime.now(UTC))
     db.add(obj)
     await db.flush()
+    await load_params()  # reload params to update the cache
     return RetData(data=ParameterEntity.model_validate(obj), message="Parameter created")
 
 
@@ -64,6 +66,7 @@ async def update(
         setattr(obj, k, v)
     obj.updatedAt = datetime.now(UTC)
     await db.flush()
+    await load_params()  # reload params to update the cache
     return RetData(data=ParameterEntity.model_validate(obj), message="Parameter updated")
 
 
@@ -77,4 +80,5 @@ async def remove(
     entity = ParameterEntity.model_validate(obj)
     await db.delete(obj)
     await db.flush()
+    await load_params()  # reload params to update the cache
     return RetData(data=entity, message="Parameter removed")
