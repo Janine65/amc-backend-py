@@ -18,7 +18,7 @@ konfiguriert (`autogenerate` ist deaktiviert; nur manuelle Revisionen).
 ## Setup
 
 ```bash
-python3.12 -m venv .venv
+python3.13 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements-dev.txt
 cp .env.example .env  # Werte ausfüllen

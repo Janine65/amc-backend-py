@@ -5,7 +5,7 @@ description = "Backend for AMC Internal Application (Python / FastAPI port of am
 authors = [{ name = "Janine Franken", email = "janine@automoto-sr.info" }]
 readme = "README.md"
 license = { text = "UNLICENSED" }
-requires-python = ">=3.11"
+requires-python = ">=3.13"
 
 [project.urls]
 Homepage = "https://interna.automoto-sr.info"
@@ -19,7 +19,7 @@ dev = [
 
 [tool.ruff]
 line-length = 120
-target-version = "py311"
+target-version = "py313"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
