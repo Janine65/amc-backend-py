@@ -7,12 +7,13 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from jose import JWTError, jwt
-from passlib.context import CryptContext
+from pwdlib import PasswordHash
+from pwdlib.hashers.bcrypt import BcryptHasher
 
 ROUNDS_OF_HASHING = 10
 DEV_FALLBACK_SECRET = "dev-only-secret-do-not-use-in-production-environment"
 
-_pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__rounds=ROUNDS_OF_HASHING)
+_pwd_context = PasswordHash((BcryptHasher(rounds=ROUNDS_OF_HASHING),))
 
 
 def get_jwt_secret() -> str:

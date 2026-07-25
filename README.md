@@ -7,7 +7,7 @@ Python / FastAPI für die AMC Internal Application.
 - **FastAPI** + Uvicorn
 - **SQLAlchemy 2.0 (async, asyncpg)** + Alembic
 - **Pydantic v2** + `pydantic-settings`
-- **python-jose** für JWT, **passlib[bcrypt]** für Passwort-Hashing
+- **python-jose** für JWT, **pwdlib[bcrypt]** für Passwort-Hashing
 - **openpyxl** (Excel), **reportlab** (PDF), **qrbill** (Swiss QR-Bill)
 - **fastapi-mail** für SMTP
 
@@ -18,7 +18,7 @@ konfiguriert (`autogenerate` ist deaktiviert; nur manuelle Revisionen).
 ## Setup
 
 ```bash
-python3.11 -m venv .venv
+python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements-dev.txt
 cp .env.example .env  # Werte ausfüllen

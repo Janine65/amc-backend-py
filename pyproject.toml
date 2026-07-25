@@ -12,9 +12,9 @@ Homepage = "https://interna.automoto-sr.info"
 
 [project.optional-dependencies]
 dev = [
-    "ruff==0.15.17",
-    "pytest==8.3.4",
-    "pytest-asyncio==0.24.0",
+    "ruff==0.16.0",
+    "pytest==9.1.1",
+    "pytest-asyncio==1.4.0",
 ]
 
 [tool.ruff]
