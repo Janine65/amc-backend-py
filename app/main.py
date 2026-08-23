@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from importlib.metadata import distributions
 
@@ -56,7 +56,7 @@ logger = get_logger(__name__)
 
 
 @asynccontextmanager
-async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+async def lifespan(_: FastAPI) -> AsyncGenerator[None]:
     """Load runtime parameters from the database before serving traffic."""
     logger.info("Starting %s v%s", PACKAGE_NAME, PACKAGE_VERSION)
     await load_params()
