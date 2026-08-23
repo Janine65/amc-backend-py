@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
+from fastapi import Request
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -40,9 +42,7 @@ def _split_schema(url: str) -> tuple[str, str | None]:
         else:
             remaining.append((key, value))
     new_query = urlencode(remaining)
-    cleaned = urlunsplit(
-        (parts.scheme, parts.netloc, parts.path, new_query, parts.fragment)
-    )
+    cleaned = urlunsplit((parts.scheme, parts.netloc, parts.path, new_query, parts.fragment))
     return cleaned, schema
 
 
@@ -68,24 +68,38 @@ def get_engine() -> AsyncEngine:
     return _engine
 
 
+def _get_session_maker() -> async_sessionmaker[AsyncSession]:
+    global _session_maker
+    if _session_maker is None:
+        _session_maker = async_sessionmaker(get_engine(), expire_on_commit=False)
+    return _session_maker
+
+
 def async_session_maker() -> AsyncSession:  # type: ignore[override]
-    """Return an ``AsyncSession`` context manager (used as ``async with``)."""
-    global _session_maker
-    if _session_maker is None:
-        _session_maker = async_sessionmaker(get_engine(), expire_on_commit=False)
-    return _session_maker()
+    """Return a fresh ``AsyncSession`` (used as ``async with`` outside of requests)."""
+    return _get_session_maker()()
 
 
-async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    """FastAPI dependency that yields an ``AsyncSession``."""
-    global _session_maker
-    if _session_maker is None:
-        _session_maker = async_sessionmaker(get_engine(), expire_on_commit=False)
-    async with _session_maker() as session:
+@asynccontextmanager
+async def db_session_scope() -> AsyncGenerator[AsyncSession]:
+    """Open a session, commit on success, rollback on error. Used by middleware."""
+    async with _get_session_maker()() as session:
         try:
             yield session
-            await session.commit()
         except Exception:
-            logger.exception("DB session rollback")
+            logger.exception("DB session rollback (exception)")
             await session.rollback()
             raise
+
+
+async def get_db(request: Request) -> AsyncSession:
+    """FastAPI dependency returning the request-scoped ``AsyncSession``.
+
+    The session is opened by ``DBSessionMiddleware`` and committed there,
+    so that the transaction is guaranteed to be persisted BEFORE the response
+    is sent to the client.
+    """
+    session: AsyncSession | None = getattr(request.state, "db", None)
+    if session is None:
+        raise RuntimeError("DB session not initialised — is DBSessionMiddleware installed?")
+    return session

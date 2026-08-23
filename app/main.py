@@ -25,6 +25,7 @@ from app.core.config import (
     get_config,
     load_params,
 )
+from app.core.database import db_session_scope
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import configure_logging, get_logger
 from app.routers import (
@@ -127,6 +128,20 @@ async def set_secure_headers(request: Request, call_next):  # noqa: ANN001
     response = await call_next(request)
     await secure_headers.set_headers_async(response)
     return response
+
+
+# DB-Session-Middleware: öffnet die Session pro Request und committet VOR dem
+# Zurückgeben der Response, damit unmittelbare Folge-GETs die Schreib-Änderungen sehen.
+@app.middleware("http")
+async def db_session_middleware(request: Request, call_next):  # noqa: ANN001
+    async with db_session_scope() as session:
+        request.state.db = session
+        response = await call_next(request)
+        if response.status_code < 400:
+            await session.commit()
+        else:
+            await session.rollback()
+        return response
 
 
 # Exception handlers (DB → HTTP)
