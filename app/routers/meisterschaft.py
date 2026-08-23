@@ -207,6 +207,9 @@ async def create(
     db.add(obj)
     await db.flush()
     await db.refresh(obj, ["anlaesse", "adressen"])
+    # Explizit committen, damit ein direkt folgender GET die Zeile sicher sieht.
+    await db.commit()
+    await db.refresh(obj, ["anlaesse", "adressen"])
     return RetData(data=MeisterschaftEntity.model_validate(obj), message="create")
 
 
@@ -253,6 +256,7 @@ async def update(
         setattr(obj, k, v)
     obj.updatedAt = datetime.now(UTC)
     await db.flush()
+    await db.commit()
     await db.refresh(obj, ["anlaesse", "adressen"])
     return RetData(data=MeisterschaftEntity.model_validate(obj), message="findOne")
 
@@ -268,4 +272,5 @@ async def remove(
     entity = MeisterschaftEntity.model_validate(obj)
     await db.delete(obj)
     await db.flush()
+    await db.commit()
     return RetData(data=entity, message="findOne")
