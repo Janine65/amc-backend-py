@@ -37,6 +37,7 @@ class AdressenBase(BaseModel):
     arbeitgeber: str | None = None
     pensioniert: bool = False
     allianz: bool = False
+    unsubscribe: bool = False
     notes: str | None = None
     fullname: str | None = None
 

@@ -19,6 +19,23 @@ def test_list_requires_auth(client: TestClient) -> None:
     assert client.get("/adressen").status_code == 401
 
 
+def test_unsubscribe_invalid_token(client: TestClient) -> None:
+    response = client.get("/adressen/unsubscribe", params={"email": "x@y.z", "token": "bad"})
+    assert response.status_code == 400
+
+
+def test_unsubscribe_valid_token_shows_form(client: TestClient, monkeypatch) -> None:
+    from app.core.config import get_config
+    from app.utils.unsubscribe import make_token
+
+    monkeypatch.setitem(get_config().raw, "unsubscribe_secret", "test-secret")
+    email = "unsubscribe-test@example.com"
+    response = client.get("/adressen/unsubscribe", params={"email": email, "token": make_token(email)})
+    assert response.status_code == 200
+    assert "abbestellen" in response.text
+    assert email in response.text
+
+
 def test_find_all(client: TestClient, auth_headers: dict[str, str]) -> None:
     response = client.get("/adressen", headers=auth_headers)
     assert response.status_code == 200, response.text

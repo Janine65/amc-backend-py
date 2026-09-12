@@ -52,6 +52,7 @@ class Adressen(Base):
     arbeitgeber: Mapped[str | None] = mapped_column(String(50), nullable=True)
     pensioniert: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     allianz: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    unsubscribe: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     fullname: Mapped[str | None] = mapped_column(String(250), nullable=True)
 

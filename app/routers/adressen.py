@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 import os
 import shutil
 import tempfile
@@ -11,6 +12,7 @@ from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import HTMLResponse
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font
 from pydantic import BaseModel
@@ -36,6 +38,7 @@ from app.schemas.adressen import AdressenCreate, AdressenEntity, AdressenUpdate
 from app.schemas.ret_data import RetData, RetDataFile, RetDataFilePayload
 from app.utils.general import I_FONT_SIZE_ROW, I_FONT_SIZE_TITEL, set_cell_value_format
 from app.utils.mail import send_mail
+from app.utils.unsubscribe import verify_token
 
 logger = get_logger(__name__)
 
@@ -203,6 +206,60 @@ async def send_email(body: EmailBody, _: CurrentUser) -> RetData[dict]:
         logger.exception("sendmail failed (signature=%s)", signature)
         return RetData(data={}, type="error", message=str(exc))
     return RetData(data={}, type="success", message="Email sent")
+
+
+# ---------------------------------------------------------------------------
+# Unsubscribe (public, token-gated; supports RFC 8058 one-click)
+# ---------------------------------------------------------------------------
+
+
+def _unsubscribe_page(inner: str) -> str:
+    return (
+        '<!doctype html><html lang="de"><head><meta charset="utf-8">'
+        "<title>AMC Swissair – E-Mails abbestellen</title></head>"
+        '<body style="font-family:sans-serif;max-width:32rem;margin:4rem auto;padding:0 1rem">'
+        f"{inner}</body></html>"
+    )
+
+
+@router.get("/unsubscribe", response_class=HTMLResponse)
+async def unsubscribe_form(email: str, token: str) -> HTMLResponse:
+    if not verify_token(email, token):
+        return HTMLResponse(
+            _unsubscribe_page("<h1>Ungültiger Link</h1><p>Dieser Abmelde-Link ist ungültig.</p>"),
+            status_code=400,
+        )
+    return HTMLResponse(
+        _unsubscribe_page(
+            "<h1>E-Mails abbestellen</h1>"
+            f"<p>Möchtest du keine weiteren E-Mails des AMC Swissair an <b>{html.escape(email)}</b> erhalten?</p>"
+            '<form method="post"><button type="submit" '
+            'style="padding:0.6rem 1.2rem;font-size:1rem;cursor:pointer">Ja, abmelden</button></form>'
+        )
+    )
+
+
+@router.post("/unsubscribe", response_class=HTMLResponse)
+async def unsubscribe_confirm(email: str, token: str, db: Annotated[AsyncSession, Depends(get_db)]) -> HTMLResponse:
+    if not verify_token(email, token):
+        return HTMLResponse(
+            _unsubscribe_page("<h1>Ungültiger Link</h1><p>Dieser Abmelde-Link ist ungültig.</p>"),
+            status_code=400,
+        )
+    rows = (
+        (await db.execute(select(Adressen).where(func.lower(Adressen.email) == email.strip().lower()))).scalars().all()
+    )
+    for adresse in rows:
+        adresse.unsubscribe = True
+        adresse.updatedAt = datetime.now(UTC)
+    await db.commit()
+    logger.info("Unsubscribe via link: email=%s, betroffene Adressen=%d", email, len(rows))
+    return HTMLResponse(
+        _unsubscribe_page(
+            "<h1>Abgemeldet</h1>"
+            f"<p><b>{html.escape(email)}</b> erhält keine weiteren Massen-E-Mails des AMC Swissair.</p>"
+        )
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -15,6 +15,7 @@
       "dbtype": "postgresql+asyncpg",
       "defaultEmail": "JanineFranken",
       "userEmail": "Janine Franken",
+      "unsubscribe_secret": "${UNSUBSCRIBE_SECRET}",
       "JanineFranken": {
         "smtp": "smtp.zoho.com",
         "smtp_port": 465,
@@ -47,7 +48,8 @@
       "db_user": "postgres",
       "port": 5439,
       "host": "0.0.0.0",
-      "defaultEmail": "HansjoergDutler"
+      "defaultEmail": "HansjoergDutler",
+      "unsubscribe_secret": "${UNSUBSCRIBE_SECRET}"
     }
   }
 }

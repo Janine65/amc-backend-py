@@ -8,12 +8,14 @@ import ssl
 from collections.abc import Iterable
 from email.message import EmailMessage
 from pathlib import Path
+from urllib.parse import quote
 
 import aiosmtplib
 import certifi
 
 from app.core.config import get_config
 from app.core.logging import get_logger
+from app.utils.unsubscribe import make_token
 
 logger = get_logger(__name__)
 
@@ -119,7 +121,11 @@ async def send_mail(
             maintype, _, subtype = mime.partition("/")
             prepared_attachments.append((content, maintype, subtype, filename))
 
-    def _build_message(to_val: str | None, cc_val: str | None) -> EmailMessage:
+    def _build_message(
+        to_val: str | None,
+        cc_val: str | None,
+        unsubscribe_addr: str | None = None,
+    ) -> EmailMessage:
         m = EmailMessage()
         m["From"] = smtp_cfg["email_from"]
         if to_val:
@@ -127,15 +133,46 @@ async def send_mail(
         if cc_val:
             m["Cc"] = cc_val
         m["Subject"] = subject
+
+        # Abmelde-Link: signierter One-Click-Link aufs Backend; ohne Secret
+        # Fallback auf mailto an den Absender mit "Unsubscribe" im Betreff.
+        unsub_html = ""
+        unsub_text = ""
+        if unsubscribe_addr:
+            token = make_token(unsubscribe_addr)
+            webhost = str((cfg.raw or {}).get("webhost") or "").rstrip("/")
+            if token and webhost:
+                url = f"{webhost}/amcbackend/adressen/unsubscribe?email={quote(unsubscribe_addr)}&token={token}"
+                m["List-Unsubscribe"] = f"<{url}>"
+                m["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click"
+                unsub_html = (
+                    '<p style="font-size:0.8em;color:#666">'
+                    f'Keine weiteren E-Mails erwünscht? <a href="{url}">Hier abmelden</a>.'
+                    "</p>"
+                )
+                unsub_text = f"\n\nKeine weiteren E-Mails erwünscht? Abmelden: {url}"
+            else:
+                mailto = f"mailto:{smtp_cfg['email_from']}?subject={quote(f'Unsubscribe {unsubscribe_addr}')}"
+                m["List-Unsubscribe"] = f"<{mailto}>"
+                unsub_html = (
+                    '<p style="font-size:0.8em;color:#666">'
+                    f'Keine weiteren E-Mails erwünscht? <a href="{mailto}">Hier abmelden</a>.'
+                    "</p>"
+                )
+                unsub_text = (
+                    "\n\nKeine weiteren E-Mails erwünscht? Sende eine E-Mail mit dem Betreff "
+                    f"'Unsubscribe {unsubscribe_addr}' an {smtp_cfg['email_from']}."
+                )
+
         if html is not None:
-            m.set_content(text or "")
-            full_html = html + (f"<p>{sig_html}</p>" if sig_html else "")
+            m.set_content((text or "") + unsub_text)
+            full_html = html + (f"<p>{sig_html}</p>" if sig_html else "") + unsub_html
             m.add_alternative(full_html, subtype="html")
         else:
             body = text or ""
             if sig_html:
                 body += "\n\n" + sig_html
-            m.set_content(body)
+            m.set_content(body + unsub_text)
         for content, maintype, subtype, filename in prepared_attachments:
             m.add_attachment(
                 content,
@@ -153,7 +190,7 @@ async def send_mail(
         if to_header and to_header not in bcc_list:
             messages.append((_build_message(to_header, cc_header), "main"))
         for addr in bcc_list:
-            messages.append((_build_message(addr, cc_header), f"bcc:{addr}"))
+            messages.append((_build_message(addr, cc_header, unsubscribe_addr=addr), f"bcc:{addr}"))
     else:
         messages.append((_build_message(to_header, cc_header), "main"))
 
