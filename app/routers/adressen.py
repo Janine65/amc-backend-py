@@ -559,8 +559,9 @@ async def remove(adr_id: int, _: CurrentUser, db: Annotated[AsyncSession, Depend
     obj = await db.get(Adressen, adr_id)
     if obj is None:
         raise HTTPException(status_code=404, detail="Address not found")
-    obj.austritt = date_cls.today()
+    obj.austritt = datetime(date_cls.today().year, 12, 31)
     obj.updatedAt = datetime.now(UTC)
+    obj.unsubscribe = True
     await db.flush()
     await db.refresh(obj, ["adressen"])
     return RetData(data=AdressenEntity.model_validate(obj), message="Address deleted")
