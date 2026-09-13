@@ -216,7 +216,7 @@ async def send_email(body: EmailBody, _: CurrentUser) -> RetData[dict]:
 def _unsubscribe_page(inner: str) -> str:
     return (
         '<!doctype html><html lang="de"><head><meta charset="utf-8">'
-        "<title>AMC Swissair – E-Mails abbestellen</title></head>"
+        "<title>Auto-Moto-Club Swissair – E-Mails abbestellen</title></head>"
         '<body style="font-family:sans-serif;max-width:32rem;margin:4rem auto;padding:0 1rem">'
         f"{inner}</body></html>"
     )
@@ -232,7 +232,7 @@ async def unsubscribe_form(email: str, token: str) -> HTMLResponse:
     return HTMLResponse(
         _unsubscribe_page(
             "<h1>E-Mails abbestellen</h1>"
-            f"<p>Möchtest du keine weiteren E-Mails des AMC Swissair an <b>{html.escape(email)}</b> erhalten?</p>"
+            f"<p>Möchtest du keine weiteren E-Mails des Auto-Moto-Club Swissair an <b>{html.escape(email)}</b> erhalten?</p>"
             '<form method="post"><button type="submit" '
             'style="padding:0.6rem 1.2rem;font-size:1rem;cursor:pointer">Ja, abmelden</button></form>'
         )
@@ -257,7 +257,7 @@ async def unsubscribe_confirm(email: str, token: str, db: Annotated[AsyncSession
     return HTMLResponse(
         _unsubscribe_page(
             "<h1>Abgemeldet</h1>"
-            f"<p><b>{html.escape(email)}</b> erhält keine weiteren Massen-E-Mails des AMC Swissair.</p>"
+            f"<p><b>{html.escape(email)}</b> erhält keine weiteren Massen-E-Mails des Auto-Moto-Club Swissair.</p>"
         )
     )
 

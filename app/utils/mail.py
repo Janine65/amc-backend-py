@@ -7,6 +7,7 @@ import os
 import ssl
 from collections.abc import Iterable
 from email.message import EmailMessage
+from email.utils import parseaddr
 from pathlib import Path
 from urllib.parse import quote
 
@@ -19,8 +20,6 @@ from app.utils.unsubscribe import make_token
 
 logger = get_logger(__name__)
 
-SIGNATURE_HTML_DIR = Path(__file__).resolve().parent.parent / "public" / "assets"
-
 
 def _build_tls_context() -> ssl.SSLContext:
     """SSL context using certifi's CA bundle (fixes macOS "unable to get local issuer")."""
@@ -28,7 +27,8 @@ def _build_tls_context() -> ssl.SSLContext:
 
 
 def _read_signature(signature: str) -> str:
-    path = SIGNATURE_HTML_DIR / f"{signature}.html"
+    # /Users/janinefranken/Development/JS/amc-backend-py/public/assets/JanineFranken.html
+    path = Path(f"{get_config().assets}") / f"{signature}.html"
     if path.exists():
         return path.read_text(encoding="utf-8")
     return ""
@@ -134,16 +134,19 @@ async def send_mail(
             m["Cc"] = cc_val
         m["Subject"] = subject
 
-        # Abmelde-Link: signierter One-Click-Link aufs Backend; ohne Secret
-        # Fallback auf mailto an den Absender mit "Unsubscribe" im Betreff.
+        # Abmelde-Link: mailto (Outlook) + signierter One-Click-Link (Gmail);
+        # ohne Secret nur mailto an den Absender mit "Unsubscribe" im Betreff.
         unsub_html = ""
         unsub_text = ""
         if unsubscribe_addr:
             token = make_token(unsubscribe_addr)
             webhost = str((cfg.raw or {}).get("webhost") or "").rstrip("/")
+            # reine Absenderadresse ohne Anzeigename (mailto-URLs erlauben keinen Display-Namen)
+            from_addr = parseaddr(str(smtp_cfg["email_from"]))[1]
+            mailto = f"mailto:{from_addr}?subject={quote(f'Unsubscribe {unsubscribe_addr}')}"
             if token and webhost:
                 url = f"{webhost}/amcbackend/adressen/unsubscribe?email={quote(unsubscribe_addr)}&token={token}"
-                m["List-Unsubscribe"] = f"<{url}>"
+                m["List-Unsubscribe"] = f"<{mailto}>, <{url}>"
                 m["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click"
                 unsub_html = (
                     '<p style="font-size:0.8em;color:#666">'
@@ -152,7 +155,6 @@ async def send_mail(
                 )
                 unsub_text = f"\n\nKeine weiteren E-Mails erwünscht? Abmelden: {url}"
             else:
-                mailto = f"mailto:{smtp_cfg['email_from']}?subject={quote(f'Unsubscribe {unsubscribe_addr}')}"
                 m["List-Unsubscribe"] = f"<{mailto}>"
                 unsub_html = (
                     '<p style="font-size:0.8em;color:#666">'
@@ -161,7 +163,7 @@ async def send_mail(
                 )
                 unsub_text = (
                     "\n\nKeine weiteren E-Mails erwünscht? Sende eine E-Mail mit dem Betreff "
-                    f"'Unsubscribe {unsubscribe_addr}' an {smtp_cfg['email_from']}."
+                    f"'Unsubscribe {unsubscribe_addr}' an {from_addr}."
                 )
 
         if html is not None:
