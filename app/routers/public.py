@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_config
 from app.core.database import get_db
 from app.core.logging import get_logger
 from app.core.ratelimit import limiter
@@ -29,6 +30,7 @@ from app.schemas.bericht import BerichtPublic
 from app.schemas.news import NewsPublic
 from app.schemas.public import AgendaPublic, JahrFreigabePublic, MeisterPublic
 from app.schemas.ret_data import RetData
+from app.utils.mail import send_mail
 
 logger = get_logger(__name__)
 
@@ -132,6 +134,19 @@ async def create_anmeldung(
         )
     )
     await db.flush()
+
+    # Mail senden an default Signatur
+    cfg = get_config()
+    signature = cfg.raw.get("defaultEmail", "JanineFranken")
+    smtp_cfg = (cfg.raw or {}).get(signature)
+
+    message = f"<p>{body.vorname} {body.name} hat sich für den Anlass {anlass.name} am {anlass.datum} angemeldet.</p>"
+    await send_mail(
+        subject="Neue Anmeldung",
+        to=smtp_cfg.get("smtp_user", "janine@automoto-sr.info") if smtp_cfg else "janine@automoto-sr.info",
+        sender_signature=signature,
+        html=message,
+    )
     return RetData(data=None, message="Anmeldung erhalten")
 
 
