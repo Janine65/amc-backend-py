@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, time
 
 from pydantic import BaseModel, ConfigDict
 
@@ -19,6 +19,9 @@ class AnlaesseBase(BaseModel):
     anlaesseid: int | None = None
     status: int = 1
     longname: str
+    zeit_von: time | None = None
+    zeit_bis: time | None = None
+    ort: str | None = None
 
 
 class AnlaesseCreate(AnlaesseBase):

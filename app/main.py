@@ -12,10 +12,9 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
-from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
-from slowapi.util import get_remote_address
 
 from app.core.config import (
     PACKAGE_AUTHOR,
@@ -28,20 +27,26 @@ from app.core.config import (
 from app.core.database import db_session_scope
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import configure_logging, get_logger
+from app.core.ratelimit import limiter
 from app.routers import (
     account,
     adressen,
     anlaesse,
+    anmeldungen,
     auth,
+    bericht,
     budget,
     clubmeister,
     fiscalyear,
+    jahr_freigabe,
     journal,
     journal_receipt,
     kegelkasse,
     kegelmeister,
     meisterschaft,
+    news,
     parameter,
+    public,
     receipt,
     user,
 )
@@ -92,10 +97,6 @@ app.add_middleware(
 app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 # Rate limiting (slowapi) — 10/sec, 100/min
-limiter = Limiter(
-    key_func=get_remote_address,
-    default_limits=["100/minute", "10/second"],
-)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
 app.add_middleware(SlowAPIMiddleware)
@@ -168,6 +169,11 @@ app.include_router(clubmeister.router)
 app.include_router(kegelmeister.router)
 app.include_router(kegelkasse.router)
 app.include_router(files_router.router)
+app.include_router(news.router)
+app.include_router(bericht.router)
+app.include_router(anmeldungen.router)
+app.include_router(jahr_freigabe.router)
+app.include_router(public.router)
 
 
 # ---------------------------------------------------------------------------

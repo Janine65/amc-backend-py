@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, time
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, Date, ForeignKey, Integer, SmallInteger, String
+from sqlalchemy import Boolean, Date, ForeignKey, Integer, SmallInteger, String, Text, Time
 from sqlalchemy.dialects.postgresql import TIMESTAMP
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -21,7 +21,7 @@ class Anlaesse(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     datum: Mapped[date] = mapped_column(Date, nullable=False)
     name: Mapped[str] = mapped_column(String(50), nullable=False)
-    beschreibung: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    beschreibung: Mapped[str | None] = mapped_column(Text, nullable=True)
     punkte: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
     istkegeln: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     istsamanlass: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
@@ -32,6 +32,9 @@ class Anlaesse(Base):
     updatedAt: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
     status: Mapped[int] = mapped_column(SmallInteger, default=1, nullable=False)
     longname: Mapped[str] = mapped_column(String(250), nullable=False)
+    zeit_von: Mapped[time | None] = mapped_column(Time, nullable=True)
+    zeit_bis: Mapped[time | None] = mapped_column(Time, nullable=True)
+    ort: Mapped[str | None] = mapped_column(String(150), nullable=True)
 
     # self-referential
     anlaesse: Mapped[Anlaesse | None] = relationship(
