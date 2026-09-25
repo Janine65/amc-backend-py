@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, time
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
 
 class AnlaesseBase(BaseModel):
@@ -24,9 +24,16 @@ class AnlaesseBase(BaseModel):
     zeit_bis: time | None = None
     ort: str | None = None
 
+    @field_validator("istkegeln", "istsamanlass", "nachkegeln", "istmotorrad", mode="before")
+    @classmethod
+    def _bool_none_to_false(cls, v: object) -> object:
+        # Frontend sendet für nicht gesetzte Checkboxen null
+        return False if v is None else v
+
 
 class AnlaesseCreate(AnlaesseBase):
-    pass
+    # longname wird im Backend aus Datum + Name generiert
+    longname: str | None = None  # type: ignore[assignment]
 
 
 class AnlaesseUpdate(AnlaesseBase):

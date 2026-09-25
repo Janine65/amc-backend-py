@@ -108,6 +108,8 @@ async def create_anmeldung(
         raise HTTPException(status_code=404, detail="Anlass nicht gefunden oder bereits vorbei.")
     if anlass.istkegeln:
         raise HTTPException(status_code=400, detail="Für Kegel-Anlässe ist keine Anmeldung nötig.")
+    if anlass.istmotorrad:
+        raise HTTPException(status_code=400, detail="Für Motorrad-Anlässe ist keine Anmeldung nötig.")
 
     existing = await db.scalar(
         select(AnlassAnmeldung).where(

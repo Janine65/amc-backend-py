@@ -16,6 +16,7 @@ class AgendaPublic(BaseModel):
     name: str
     beschreibung: str | None = None
     istkegeln: bool = False
+    istmotorrad: bool = False
     zeit_von: time | None = None
     zeit_bis: time | None = None
     ort: str | None = None
