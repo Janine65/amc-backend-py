@@ -26,6 +26,7 @@ class Anlaesse(Base):
     istkegeln: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     istsamanlass: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     nachkegeln: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    istmotorrad: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     gaeste: Mapped[int | None] = mapped_column(SmallInteger, default=0, nullable=True)
     anlaesseid: Mapped[int | None] = mapped_column(Integer, ForeignKey("anlaesse.id"), nullable=True)
     createdAt: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)

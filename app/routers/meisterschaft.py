@@ -176,7 +176,7 @@ async def get_chart_data(
         (
             await db.execute(
                 select(Anlaesse)
-                .where(and_(Anlaesse.datum >= start, Anlaesse.datum <= end))
+                .where(and_(Anlaesse.datum >= start, Anlaesse.datum <= end, Anlaesse.istmotorrad.is_(False)))
                 .order_by(Anlaesse.datum.asc())
             )
         )

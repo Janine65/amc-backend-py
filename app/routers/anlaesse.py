@@ -53,13 +53,23 @@ async def get_overview(db: Annotated[AsyncSession, Depends(get_db)]) -> RetData[
     to_d = date(int(year) + 1, 1, 1)
     total = await db.scalar(
         select(func.count(Anlaesse.id)).where(
-            and_(Anlaesse.datum >= from_d, Anlaesse.datum < to_d, Anlaesse.nachkegeln.is_(False))
+            and_(
+                Anlaesse.datum >= from_d,
+                Anlaesse.datum < to_d,
+                Anlaesse.nachkegeln.is_(False),
+                Anlaesse.istmotorrad.is_(False),
+            )
         )
     )
     today = datetime.now(UTC).date()
     upcoming = await db.scalar(
         select(func.count(Anlaesse.id)).where(
-            and_(Anlaesse.datum > today, Anlaesse.datum < to_d, Anlaesse.nachkegeln.is_(False))
+            and_(
+                Anlaesse.datum > today,
+                Anlaesse.datum < to_d,
+                Anlaesse.nachkegeln.is_(False),
+                Anlaesse.istmotorrad.is_(False),
+            )
         )
     )
     return RetData(
@@ -79,7 +89,7 @@ async def get_fk_data(jahr: str, _: CurrentUser, db: Annotated[AsyncSession, Dep
         (
             await db.execute(
                 select(Anlaesse)
-                .where(and_(Anlaesse.datum > from_d, Anlaesse.datum < to_d))
+                .where(and_(Anlaesse.datum > from_d, Anlaesse.datum < to_d, Anlaesse.istmotorrad.is_(False)))
                 .order_by(Anlaesse.datum.asc())
             )
         )
@@ -101,7 +111,7 @@ async def _create_template(db: AsyncSession, syear: str, sheet: Worksheet, incl_
         (
             await db.execute(
                 select(Anlaesse)
-                .where(and_(Anlaesse.datum > from_d, Anlaesse.datum < to_d))
+                .where(and_(Anlaesse.datum > from_d, Anlaesse.datum < to_d, Anlaesse.istmotorrad.is_(False)))
                 .order_by(Anlaesse.istkegeln.desc(), Anlaesse.datum.asc(), Anlaesse.name.asc())
             )
         )

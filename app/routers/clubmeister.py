@@ -72,6 +72,7 @@ async def calc_meister(jahr: str, db: Annotated[AsyncSession, Depends(get_db)]) 
                         Anlaesse.datum >= start,
                         Anlaesse.datum <= end,
                         Anlaesse.punkte >= 0,
+                        Anlaesse.istmotorrad.is_(False),
                     )
                 )
                 .distinct()
@@ -96,6 +97,7 @@ async def calc_meister(jahr: str, db: Annotated[AsyncSession, Depends(get_db)]) 
                             Anlaesse.datum >= start,
                             Anlaesse.datum <= end,
                             Anlaesse.punkte >= 0,
+                            Anlaesse.istmotorrad.is_(False),
                         )
                     )
                 )

@@ -15,6 +15,7 @@ class AnlaesseBase(BaseModel):
     istkegeln: bool = False
     istsamanlass: bool = False
     nachkegeln: bool = False
+    istmotorrad: bool = False
     gaeste: int | None = 0
     anlaesseid: int | None = None
     status: int = 1
