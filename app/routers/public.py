@@ -7,29 +7,35 @@ Meisterschafts-Daten werden nur ausgeliefert, wenn das Jahr in
 
 from __future__ import annotations
 
+import html
 from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_config
 from app.core.database import get_db
 from app.core.logging import get_logger
 from app.core.ratelimit import limiter
+from app.models.adressen import Adressen
 from app.models.anlaesse import Anlaesse
 from app.models.anlass_anmeldung import AnlassAnmeldung
 from app.models.bericht import Bericht
+from app.models.besucher import BesucherZaehler
 from app.models.clubmeister import Clubmeister
 from app.models.jahr_freigabe import JahrFreigabe
 from app.models.kegelmeister import Kegelmeister
+from app.models.kontakt import Kontakt
 from app.models.news import News
 from app.schemas.anlass_anmeldung import AnmeldungPublicCreate
 from app.schemas.bericht import BerichtPublic
+from app.schemas.kontakt import KontaktPublicCreate
 from app.schemas.news import NewsPublic
-from app.schemas.public import AgendaPublic, JahrFreigabePublic, MeisterPublic
+from app.schemas.public import AgendaPublic, CaptchaPublic, JahrFreigabePublic, MeisterPublic
 from app.schemas.ret_data import RetData
+from app.utils.captcha import create_captcha, verify_captcha
 from app.utils.mail import send_mail
 
 logger = get_logger(__name__)
@@ -90,6 +96,13 @@ async def get_agenda(db: Annotated[AsyncSession, Depends(get_db)]) -> RetData[li
     return RetData(data=[AgendaPublic.model_validate(r) for r in rows], message="Agenda")
 
 
+@router.get("/captcha", response_model=RetData[CaptchaPublic])
+@limiter.limit("30/minute")
+async def get_captcha(request: Request) -> RetData[CaptchaPublic]:
+    frage, token = create_captcha()
+    return RetData(data=CaptchaPublic(frage=frage, token=token), message="Captcha")
+
+
 @router.post("/anmeldung", response_model=RetData[None], status_code=201)
 @limiter.limit("5/minute")
 async def create_anmeldung(
@@ -101,6 +114,9 @@ async def create_anmeldung(
     if body.website:
         logger.warning("Anmeldung honeypot triggered from %s", request.client.host if request.client else "?")
         return RetData(data=None, message="Anmeldung erhalten")
+
+    if not verify_captcha(body.captcha_token, body.captcha):
+        raise HTTPException(status_code=400, detail="Sicherheitsfrage falsch beantwortet. Bitte erneut versuchen.")
 
     anlass = await db.get(Anlaesse, body.anlassid)
     today = datetime.now(UTC).date()
@@ -122,10 +138,22 @@ async def create_anmeldung(
     if existing is not None:
         raise HTTPException(status_code=409, detail="Für diese E-Mail-Adresse existiert bereits eine Anmeldung.")
 
+    # Adresse automatisch verknüpfen (Name, Vorname, E-Mail)
+    adresse = await db.scalar(
+        select(Adressen).where(
+            and_(
+                func.lower(Adressen.name) == body.name.strip().lower(),
+                func.lower(Adressen.vorname) == body.vorname.strip().lower(),
+                func.lower(Adressen.email) == str(body.email).lower(),
+            )
+        )
+    )
+
     now = datetime.now(UTC)
     db.add(
         AnlassAnmeldung(
             anlassid=body.anlassid,
+            adresseid=adresse.id if adresse else None,
             name=body.name.strip(),
             vorname=body.vorname.strip(),
             email=str(body.email).lower(),
@@ -142,7 +170,9 @@ async def create_anmeldung(
     signature = cfg.raw.get("defaultEmail", "JanineFranken")
     smtp_cfg = (cfg.raw or {}).get(signature)
 
-    message = f"<p>{body.vorname} {body.name} hat sich für den Anlass {anlass.name} am {anlass.datum} angemeldet.</p>"
+    message = f"<p>{body.vorname} {body.name} hat sich für den Anlass {anlass.name} am {anlass.datum.strftime('%d.%m.%Y')} angemeldet.</p>"
+    if adresse is None:
+        message += "<p>Auf der Datenbank konnte keine passende Adresse mit diesem Namen, Vornamen und dieser E-Mail-Adresse gefunden werden.</p>"
     await send_mail(
         subject="Neue Anmeldung",
         to=smtp_cfg.get("smtp_user", "janine@automoto-sr.info") if smtp_cfg else "janine@automoto-sr.info",
@@ -150,6 +180,95 @@ async def create_anmeldung(
         html=message,
     )
     return RetData(data=None, message="Anmeldung erhalten")
+
+
+@router.get("/besucher", response_model=RetData[int])
+async def get_besucher(db: Annotated[AsyncSession, Depends(get_db)]) -> RetData[int]:
+    count = await db.scalar(select(BesucherZaehler.zaehler).where(BesucherZaehler.id == 1))
+    return RetData(data=count or 0, message="Besucher")
+
+
+@router.post("/besucher", response_model=RetData[int])
+@limiter.limit("20/minute")
+async def count_besucher(
+    request: Request,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> RetData[int]:
+    """Zählt einen neuen Besucher (atomarer Increment) und liefert den Stand."""
+    count = await db.scalar(
+        update(BesucherZaehler)
+        .where(BesucherZaehler.id == 1)
+        .values(zaehler=BesucherZaehler.zaehler + 1, updatedAt=datetime.now(UTC))
+        .returning(BesucherZaehler.zaehler)
+    )
+    if count is None:
+        db.add(BesucherZaehler(id=1, zaehler=1, updatedAt=datetime.now(UTC)))
+        count = 1
+    return RetData(data=count, message="Besucher gezählt")
+
+
+@router.post("/kontakt", response_model=RetData[None], status_code=201)
+@limiter.limit("5/minute")
+async def create_kontakt(
+    request: Request,
+    body: KontaktPublicCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> RetData[None]:
+    # Honeypot ausgefüllt → Bot; stillschweigend "Erfolg" melden
+    if body.website:
+        logger.warning("Kontakt honeypot triggered from %s", request.client.host if request.client else "?")
+        return RetData(data=None, message="Nachricht erhalten")
+
+    if not verify_captcha(body.captcha_token, body.captcha):
+        raise HTTPException(status_code=400, detail="Sicherheitsfrage falsch beantwortet. Bitte erneut versuchen.")
+
+    now = datetime.now(UTC)
+    db.add(
+        Kontakt(
+            name=body.name.strip(),
+            vorname=body.vorname.strip(),
+            email=str(body.email).lower(),
+            betreff=body.betreff.strip(),
+            nachricht=body.nachricht.strip(),
+            createdAt=now,
+            updatedAt=now,
+        )
+    )
+    await db.flush()
+
+    # Mail senden an default Signatur
+    cfg = get_config()
+    signature = cfg.raw.get("defaultEmail", "JanineFranken")
+    smtp_cfg = (cfg.raw or {}).get(signature)
+
+    message = (
+        "<p>Neue Kontaktanfrage über die Homepage:</p>"
+        '<table cellpadding="4" style="border-collapse:collapse">'
+        f"<tr><td><b>Vorname</b></td><td>{html.escape(body.vorname.strip())}</td></tr>"
+        f"<tr><td><b>Name</b></td><td>{html.escape(body.name.strip())}</td></tr>"
+        f'<tr><td><b>E-Mail</b></td><td><a href="mailto:{html.escape(str(body.email))}">'
+        f"{html.escape(str(body.email))}</a></td></tr>"
+        f"<tr><td><b>Betreff</b></td><td>{html.escape(body.betreff.strip())}</td></tr>"
+        "</table>"
+        f"<p><b>Nachricht:</b><br>{html.escape(body.nachricht.strip()).replace(chr(10), '<br>')}</p>"
+    )
+    text = (
+        "Neue Kontaktanfrage über die Homepage:\n\n"
+        f"Vorname: {body.vorname.strip()}\n"
+        f"Name: {body.name.strip()}\n"
+        f"E-Mail: {body.email}\n"
+        f"Betreff: {body.betreff.strip()}\n\n"
+        f"Nachricht:\n{body.nachricht.strip()}"
+    )
+    await send_mail(
+        subject=f"Kontaktanfrage: {body.betreff.strip()}",
+        to=smtp_cfg.get("smtp_user", "janine@automoto-sr.info") if smtp_cfg else "janine@automoto-sr.info",
+        sender_signature=signature,
+        text=text,
+        html=message,
+        reply_to=str(body.email).lower(),
+    )
+    return RetData(data=None, message="Nachricht erhalten")
 
 
 @router.get("/jahre", response_model=RetData[list[JahrFreigabePublic]])

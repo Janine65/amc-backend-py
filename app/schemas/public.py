@@ -38,3 +38,10 @@ class JahrFreigabePublic(BaseModel):
     jahr: str
     clubmeister: bool
     kegelmeister: bool
+
+
+class CaptchaPublic(BaseModel):
+    """Rechenaufgabe für öffentliche Formulare."""
+
+    frage: str
+    token: str

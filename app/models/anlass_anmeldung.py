@@ -21,6 +21,9 @@ class AnlassAnmeldung(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     anlassid: Mapped[int] = mapped_column(Integer, ForeignKey("anlaesse.id", ondelete="CASCADE"), nullable=False)
+    adresseid: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("adressen.id", ondelete="SET NULL"), nullable=True
+    )
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     vorname: Mapped[str] = mapped_column(String(100), nullable=False)
     email: Mapped[str] = mapped_column(String(255), nullable=False)

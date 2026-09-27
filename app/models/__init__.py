@@ -13,6 +13,7 @@ from app.models.anlaesse import Anlaesse
 from app.models.anlass_anmeldung import AnlassAnmeldung
 from app.models.base import Base
 from app.models.bericht import Bericht
+from app.models.besucher import BesucherZaehler
 from app.models.budget import Budget
 from app.models.clubmeister import Clubmeister
 from app.models.fiscalyear import Fiscalyear
@@ -21,6 +22,7 @@ from app.models.journal import Journal
 from app.models.journal_receipt import JournalReceipt
 from app.models.kegelkasse import Kegelkasse
 from app.models.kegelmeister import Kegelmeister
+from app.models.kontakt import Kontakt
 from app.models.meisterschaft import Meisterschaft
 from app.models.news import News
 from app.models.parameter import Parameter

@@ -43,6 +43,7 @@ async def send_mail(
     subject: str,
     text: str = "",
     html: str | None = None,
+    reply_to: str | None = None,
     attachments: Iterable[str | tuple[str, bytes, str | None]] = (),
 ) -> None:
     """Send an email using the SMTP signature ``sender_signature``."""
@@ -132,6 +133,8 @@ async def send_mail(
             m["To"] = to_val
         if cc_val:
             m["Cc"] = cc_val
+        if reply_to:
+            m["Reply-To"] = reply_to
         m["Subject"] = subject
 
         # Abmelde-Link: mailto (Outlook) + signierter One-Click-Link (Gmail);

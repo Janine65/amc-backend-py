@@ -1,5 +1,5 @@
 # Dev / Lint / Test dependencies (install with: pip install -r requirements-dev.txt)
 -r requirements.txt
-ruff==0.16.0
+ruff==0.16.9
 pytest==9.1.1
 pytest-asyncio==1.4.0

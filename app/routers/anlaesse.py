@@ -99,6 +99,32 @@ async def get_fk_data(jahr: str, _: CurrentUser, db: Annotated[AsyncSession, Dep
     return RetData(data=[{"id": r.id, "value": r.longname} for r in rows], message="getFKData")
 
 
+@router.get("/anmeldbar", response_model=RetData[list[dict]])
+async def get_anmeldbar(_: CurrentUser, db: Annotated[AsyncSession, Depends(get_db)]) -> RetData[list[dict]]:
+    """Anlässe ab dem aktuellen Jahr, für die eine Homepage-Anmeldung möglich ist."""
+    from_d = date(datetime.now(UTC).year, 1, 1)
+    rows = (
+        (
+            await db.execute(
+                select(Anlaesse)
+                .where(
+                    and_(
+                        Anlaesse.datum >= from_d,
+                        Anlaesse.status == 1,
+                        Anlaesse.istkegeln.is_(False),
+                        Anlaesse.istmotorrad.is_(False),
+                        Anlaesse.nachkegeln.is_(False),
+                    )
+                )
+                .order_by(Anlaesse.datum.asc())
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return RetData(data=[{"id": r.id, "value": r.longname} for r in rows], message="getAnmeldbar")
+
+
 # ---------------------------------------------------------------------------
 # Stammblatt Excel export
 # ---------------------------------------------------------------------------

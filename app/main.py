@@ -43,6 +43,7 @@ from app.routers import (
     journal_receipt,
     kegelkasse,
     kegelmeister,
+    kontakte,
     meisterschaft,
     news,
     parameter,
@@ -172,6 +173,7 @@ app.include_router(files_router.router)
 app.include_router(news.router)
 app.include_router(bericht.router)
 app.include_router(anmeldungen.router)
+app.include_router(kontakte.router)
 app.include_router(jahr_freigabe.router)
 app.include_router(public.router)
 

@@ -17,17 +17,30 @@ class AnmeldungPublicCreate(BaseModel):
     bemerkung: str | None = Field(default=None, max_length=500)
     # Honeypot: muss leer bleiben, wird von Bots ausgefüllt
     website: str | None = None
+    # Rechen-Captcha (Token von GET /public/captcha)
+    captcha: str | None = None
+    captcha_token: str | None = None
 
 
 class AnmeldungUpdate(BaseModel):
     status: int | None = None
     bemerkung: str | None = None
+    adresseid: int | None = None
+
+
+class AnmeldungManualCreate(BaseModel):
+    """Manuelle Anmeldung einer bestehenden Adresse (aus dem Frontend)."""
+
+    anlassid: int
+    adresseid: int
 
 
 class AnmeldungEntity(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
     anlassid: int
+    anlass_longname: str | None = None
+    adresseid: int | None = None
     name: str
     vorname: str
     email: str
