@@ -195,6 +195,13 @@ async def count_besucher(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> RetData[int]:
     """Zählt einen neuen Besucher (atomarer Increment) und liefert den Stand."""
+    logger.info(
+        "Besucher gezählt: ip=%s remote=%s user-agent=%s referer=%s",
+        request.headers.get("x-forwarded-for", "-"),
+        request.client.host if request.client else "?",
+        request.headers.get("user-agent", "-"),
+        request.headers.get("referer", "-"),
+    )
     count = await db.scalar(
         update(BesucherZaehler)
         .where(BesucherZaehler.id == 1)
