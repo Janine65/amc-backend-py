@@ -17,18 +17,18 @@
       "userEmail": "Janine Franken",
       "unsubscribe_secret": "${UNSUBSCRIBE_SECRET}",
       "JanineFranken": {
-        "smtp": "smtp.zoho.com",
-        "smtp_port": 465,
-        "smtp_user": "janine@automoto-sr.info",
+        "smtp": "smtp-relay.brevo.com",
+        "smtp_port": 587,
+        "smtp_user": "c20a6e001@smtp-brevo.com",
         "smtp_pwd_env": "SMTP_PWD_JANINEFRANKEN",
-        "email_from": "Janine Franken <janine@automoto-sr.info>"
+        "email_from": "Auto-Moto-Club Swissair - Kassier <kassier@automoto-sr.ch>"
       },
       "HansjoergDutler": {
-        "smtp": "smtp.zoho.com",
-        "smtp_port": 465,
-        "smtp_user": "info@automoto-sr.info",
+        "smtp": "smtp-relay.brevo.com",
+        "smtp_port": 587,
+        "smtp_user": "c20a6e001@smtp-brevo.com",
         "smtp_pwd_env": "SMTP_PWD_HANSJOERGDUTLER",
-        "email_from": "AutoMotoClub Swissair <info@automoto-sr.info>"
+        "email_from": "AutoMotoClub Swissair <info@automoto-sr.ch>"
       }
     },
     "test": {
@@ -36,14 +36,13 @@
       "config_id": "test",
       "webhost": "http://localhost:4200",
       "dbhost": "host.docker.internal",
-      "defaultEmail": "JanineFranken",
-      "userEmail": "Janine Franken"
+      "defaultEmail": "JanineFranken"
     },
     "production": {
       "config_id": "production",
       "node_port": 3001,
       "dbhost": "olconet",
-      "webhost": "https://interna.automoto-sr.info",
+      "webhost": "https://interna.automoto-sr.ch",
       "database": "amcadmin",
       "db_user": "postgres",
       "port": 5439,

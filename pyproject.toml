@@ -2,13 +2,13 @@
 name = "amc-backend-py"
 version = "1.0.0"
 description = "Backend for AMC Internal Application (Python / FastAPI port of amc-backend)"
-authors = [{ name = "Janine Franken", email = "janine@automoto-sr.info" }]
+authors = [{ name = "Janine Franken", email = "janine.franken@automoto-sr.ch" }]
 readme = "README.md"
 license = { text = "UNLICENSED" }
 requires-python = ">=3.13"
 
 [project.urls]
-Homepage = "https://interna.automoto-sr.info"
+Homepage = "https://interna.automoto-sr.ch"
 
 [project.optional-dependencies]
 dev = [

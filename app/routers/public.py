@@ -173,9 +173,11 @@ async def create_anmeldung(
     message = f"<p>{body.vorname} {body.name} hat sich für den Anlass {anlass.name} am {anlass.datum.strftime('%d.%m.%Y')} angemeldet.</p>"
     if adresse is None:
         message += "<p>Auf der Datenbank konnte keine passende Adresse mit diesem Namen, Vornamen und dieser E-Mail-Adresse gefunden werden.</p>"
+    if smtp_cfg is None:
+        raise RuntimeError(f'SMTP configuration for signature "{signature}" is missing.')
     await send_mail(
         subject="Neue Anmeldung",
-        to=smtp_cfg.get("smtp_user", "janine@automoto-sr.info") if smtp_cfg else "janine@automoto-sr.info",
+        to=smtp_cfg.get("smtp_user"),
         sender_signature=signature,
         html=message,
     )
@@ -260,13 +262,15 @@ async def create_kontakt(
         f"Betreff: {body.betreff.strip()}\n\n"
         f"Nachricht:\n{body.nachricht.strip()}"
     )
+    if smtp_cfg is None:
+        raise RuntimeError(f'SMTP configuration for signature "{signature}" is missing.')
     await send_mail(
         subject=f"Kontaktanfrage: {body.betreff.strip()}",
-        to=smtp_cfg.get("smtp_user", "janine@automoto-sr.info") if smtp_cfg else "janine@automoto-sr.info",
+        to=smtp_cfg.get("email_from"),
+        cc=str(body.email).lower(),
         sender_signature=signature,
         text=text,
         html=message,
-        reply_to=str(body.email).lower(),
     )
     return RetData(data=None, message="Nachricht erhalten")
 
