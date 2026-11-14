@@ -33,14 +33,20 @@ from app.schemas.anlass_anmeldung import AnmeldungPublicCreate
 from app.schemas.bericht import BerichtPublic
 from app.schemas.kontakt import KontaktPublicCreate
 from app.schemas.news import NewsPublic
-from app.schemas.public import AgendaPublic, CaptchaPublic, JahrFreigabePublic, MeisterPublic
+from app.schemas.public import AgendaPublic, CaptchaPublic, JahrFreigabePublic, MeisterPublic, TurnstilePublic
 from app.schemas.ret_data import RetData
 from app.utils.captcha import create_captcha, verify_captcha
 from app.utils.mail import send_mail
+from app.utils.turnstile import get_turnstile_site_key, verify_turnstile
 
 logger = get_logger(__name__)
 
 router = APIRouter(prefix="/public", tags=["Public"])
+
+
+@router.get("/turnstile", response_model=RetData[TurnstilePublic])
+async def get_turnstile() -> RetData[TurnstilePublic]:
+    return RetData(data=TurnstilePublic(site_key=get_turnstile_site_key()), message="Spam-Schutz")
 
 
 @router.get("/news", response_model=RetData[list[NewsPublic]])
@@ -221,8 +227,7 @@ async def create_kontakt(
         logger.warning("Kontakt honeypot triggered from %s", request.client.host if request.client else "?")
         return RetData(data=None, message="Nachricht erhalten")
 
-    if not verify_captcha(body.captcha_token, body.captcha):
-        raise HTTPException(status_code=400, detail="Sicherheitsfrage falsch beantwortet. Bitte erneut versuchen.")
+    await verify_turnstile(body.turnstile_token)
 
     now = datetime.now(UTC)
     db.add(

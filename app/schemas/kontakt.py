@@ -17,9 +17,7 @@ class KontaktPublicCreate(BaseModel):
     nachricht: str = Field(min_length=1, max_length=5000)
     # Honeypot: muss leer bleiben, wird von Bots ausgefüllt
     website: str | None = None
-    # Rechen-Captcha (Token von GET /public/captcha)
-    captcha: str | None = None
-    captcha_token: str | None = None
+    turnstile_token: str | None = Field(default=None, max_length=2048)
 
 
 class KontaktEntity(BaseModel):

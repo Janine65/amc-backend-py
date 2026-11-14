@@ -45,3 +45,9 @@ class CaptchaPublic(BaseModel):
 
     frage: str
     token: str
+
+
+class TurnstilePublic(BaseModel):
+    """Public widget configuration; never contains the secret key."""
+
+    site_key: str

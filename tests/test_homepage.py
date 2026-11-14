@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 from datetime import date, timedelta
+from unittest.mock import AsyncMock
 
+import pytest
 from fastapi.testclient import TestClient
 
 # ---------------------------------------------------------------------------
@@ -110,7 +112,7 @@ def test_public_anmeldung_falsches_captcha(client: TestClient) -> None:
     assert response.status_code == 400
 
 
-def test_public_kontakt_ohne_captcha(client: TestClient) -> None:
+def test_public_kontakt_ohne_turnstile(client: TestClient) -> None:
     response = client.post(
         "/public/kontakt",
         json={
@@ -124,8 +126,10 @@ def test_public_kontakt_ohne_captcha(client: TestClient) -> None:
     assert response.status_code == 400
 
 
-def test_kontakt_cycle(client: TestClient, auth_headers: dict[str, str]) -> None:
+def test_kontakt_cycle(client: TestClient, auth_headers: dict[str, str], monkeypatch: pytest.MonkeyPatch) -> None:
     """Kontaktanfrage öffentlich erstellen, mit Login auflisten und löschen."""
+    verify = AsyncMock()
+    monkeypatch.setattr("app.routers.public.verify_turnstile", verify)
     created = client.post(
         "/public/kontakt",
         json={
@@ -134,10 +138,11 @@ def test_kontakt_cycle(client: TestClient, auth_headers: dict[str, str]) -> None
             "email": "pytest@example.com",
             "betreff": "PYTEST Betreff",
             "nachricht": "PYTEST Nachricht",
-            **_solve_captcha(client),
+            "turnstile_token": "test-token",
         },
     )
     assert created.status_code == 201, created.text
+    verify.assert_awaited_once_with("test-token")
 
     rows = client.get("/kontakte", headers=auth_headers).json()["data"]
     entry = next((r for r in rows if r["name"] == "PYTEST_KONTAKT"), None)
