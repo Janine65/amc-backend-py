@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from datetime import date, timedelta
 from types import SimpleNamespace
+from typing import Literal
 from unittest.mock import AsyncMock
 from urllib.parse import parse_qs
 
@@ -51,7 +53,9 @@ def contact_client(
     monkeypatch.setattr(
         public,
         "get_config",
-        lambda: SimpleNamespace(raw={"JanineFranken": {"email_from": "club@example.com"}}),
+        lambda: SimpleNamespace(
+            raw={"JanineFranken": {"email_from": "club@example.com", "smtp_user": "club@example.com"}}
+        ),
     )
     app = FastAPI()
     app.include_router(public.router)
@@ -63,13 +67,16 @@ def contact_client(
 @pytest.mark.parametrize("token", [None, "", "   "])
 async def test_missing_token(token: str | None) -> None:
     with pytest.raises(HTTPException) as exc:
-        await verify_turnstile(token)
+        await verify_turnstile(token, action="kontakt")
     assert exc.value.status_code == 400
 
 
-async def test_verification_posts_token_and_secret(monkeypatch: pytest.MonkeyPatch) -> None:
-    requests = _mock_siteverify(monkeypatch, httpx.Response(200, json={"success": True, "action": "kontakt"}))
-    await verify_turnstile("test-token")
+@pytest.mark.parametrize("action", ["kontakt", "anmeldung"])
+async def test_verification_posts_token_and_secret(
+    monkeypatch: pytest.MonkeyPatch, action: Literal["kontakt", "anmeldung"]
+) -> None:
+    requests = _mock_siteverify(monkeypatch, httpx.Response(200, json={"success": True, "action": action}))
+    await verify_turnstile("test-token", action=action)
     assert len(requests) == 1
     assert str(requests[0].url) == SITEVERIFY_URL
     assert requests[0].method == "POST"
@@ -99,7 +106,7 @@ async def test_rejects_unsuccessful_or_malformed_verification(
 ) -> None:
     _mock_siteverify(monkeypatch, httpx.Response(200, json=payload))
     with pytest.raises(HTTPException) as exc:
-        await verify_turnstile("test-token")
+        await verify_turnstile("test-token", action="kontakt")
     assert exc.value.status_code == status
 
 
@@ -115,14 +122,14 @@ async def test_rejects_unsuccessful_or_malformed_verification(
 async def test_verification_outage(monkeypatch: pytest.MonkeyPatch, result: httpx.Response | httpx.HTTPError) -> None:
     _mock_siteverify(monkeypatch, result)
     with pytest.raises(HTTPException) as exc:
-        await verify_turnstile("test-token")
+        await verify_turnstile("test-token", action="kontakt")
     assert exc.value.status_code == 503
 
 
 async def test_missing_secret(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("CLOUDFLARE_TURNSPIKE_SECRET")
     with pytest.raises(HTTPException) as exc:
-        await verify_turnstile("test-token")
+        await verify_turnstile("test-token", action="kontakt")
     assert exc.value.status_code == 503
 
 
@@ -192,14 +199,16 @@ def test_contact_verifies_before_insert_and_mail(
     assert len(requests) == (1 if token and len(token) <= 2048 else 0)
 
 
-def test_contact_honeypot_still_discards(
-    monkeypatch: pytest.MonkeyPatch, contact_client: tuple[TestClient, AsyncMock, AsyncMock]
+@pytest.mark.parametrize("route", ["kontakt", "anmeldung"])
+def test_honeypot_still_discards(
+    monkeypatch: pytest.MonkeyPatch, contact_client: tuple[TestClient, AsyncMock, AsyncMock], route: str
 ) -> None:
     client, db, mail = contact_client
     requests = _mock_siteverify(monkeypatch, httpx.Response(200, json={"success": True, "action": "kontakt"}))
     response = client.post(
-        "/public/kontakt",
+        f"/public/{route}",
         json={
+            "anlassid": 1,
             "name": "Bot",
             "vorname": "Spam",
             "email": "bot@example.com",
@@ -210,5 +219,147 @@ def test_contact_honeypot_still_discards(
     )
     assert response.status_code == 201
     assert not requests
+    db.add.assert_not_called()
+    db.get.assert_not_awaited()
+    mail.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    ("token", "verification", "status"),
+    [
+        (None, {"success": True, "action": "anmeldung"}, 400),
+        ("", {"success": True, "action": "anmeldung"}, 400),
+        ("   ", {"success": True, "action": "anmeldung"}, 400),
+        ("x" * 2049, {"success": True, "action": "anmeldung"}, 422),
+        ("test-token", {"success": False, "error-codes": ["timeout-or-duplicate"]}, 400),
+        ("test-token", {"success": True, "action": "kontakt"}, 400),
+        ("test-token", {"success": False, "error-codes": ["internal-error"]}, 503),
+        ("x" * 2048, {"success": True, "action": "anmeldung"}, 201),
+    ],
+)
+def test_registration_verifies_before_database_and_mail(
+    monkeypatch: pytest.MonkeyPatch,
+    contact_client: tuple[TestClient, AsyncMock, AsyncMock],
+    token: str | None,
+    verification: dict[str, object],
+    status: int,
+) -> None:
+    client, db, mail = contact_client
+    db.get.return_value = SimpleNamespace(
+        status=1, datum=date.today() + timedelta(days=30), istkegeln=False, istmotorrad=False, name="Testanlass"
+    )
+    db.scalar.return_value = None
+    requests = _mock_siteverify(monkeypatch, httpx.Response(200, json=verification))
+    response = client.post(
+        "/public/anmeldung",
+        json={
+            "anlassid": 1,
+            "name": "Muster",
+            "vorname": "Max",
+            "email": "max@example.com",
+            "bemerkung": "Testanmeldung",
+            "turnstile_token": token,
+        },
+    )
+    assert response.status_code == status, response.text
+    if status == 201:
+        db.add.assert_called_once()
+        entry = db.add.call_args.args[0]
+        assert entry.anlassid == 1
+        assert entry.email == "max@example.com"
+        assert entry.bemerkung == "Testanmeldung"
+        db.flush.assert_awaited_once()
+        mail.assert_awaited_once()
+    else:
+        db.get.assert_not_awaited()
+        db.add.assert_not_called()
+        db.flush.assert_not_awaited()
+        mail.assert_not_awaited()
+    assert len(requests) == (1 if token and token.strip() and len(token) <= 2048 else 0)
+
+
+@pytest.mark.parametrize(
+    ("event_state", "status"),
+    [("missing", 404), ("cancelled", 404), ("past", 404), ("kegeln", 400), ("motorrad", 400), ("duplicate", 409)],
+)
+def test_registration_preserves_event_rules(
+    monkeypatch: pytest.MonkeyPatch,
+    contact_client: tuple[TestClient, AsyncMock, AsyncMock],
+    event_state: str,
+    status: int,
+) -> None:
+    client, db, mail = contact_client
+    event = SimpleNamespace(
+        status=0 if event_state == "cancelled" else 1,
+        datum=date.today() + timedelta(days=-1 if event_state == "past" else 30),
+        istkegeln=event_state == "kegeln",
+        istmotorrad=event_state == "motorrad",
+    )
+    db.get.return_value = None if event_state == "missing" else event
+    db.scalar.return_value = object() if event_state == "duplicate" else None
+    _mock_siteverify(monkeypatch, httpx.Response(200, json={"success": True, "action": "anmeldung"}))
+    response = client.post(
+        "/public/anmeldung",
+        json={
+            "anlassid": 1,
+            "name": "Muster",
+            "vorname": "Max",
+            "email": "max@example.com",
+            "turnstile_token": "test-token",
+        },
+    )
+    assert response.status_code == status, response.text
+    db.add.assert_not_called()
+    mail.assert_not_awaited()
+
+
+@pytest.mark.parametrize("route", ["kontakt", "anmeldung"])
+def test_arithmetic_captcha_cannot_bypass_turnstile(
+    monkeypatch: pytest.MonkeyPatch, contact_client: tuple[TestClient, AsyncMock, AsyncMock], route: str
+) -> None:
+    client, db, mail = contact_client
+    requests = _mock_siteverify(monkeypatch, httpx.Response(200, json={"success": True, "action": route}))
+    captcha = client.get("/public/captcha").json()["data"]
+    a, _, b = captcha["frage"].partition(" + ")
+    response = client.post(
+        f"/public/{route}",
+        json={
+            "anlassid": 1,
+            "name": "Muster",
+            "vorname": "Max",
+            "email": "max@example.com",
+            "betreff": "Frage",
+            "nachricht": "Hallo",
+            "captcha": str(int(a) + int(b)),
+            "captcha_token": captcha["token"],
+        },
+    )
+    assert response.status_code == 400
+    assert not requests
+    db.get.assert_not_awaited()
+    db.add.assert_not_called()
+    mail.assert_not_awaited()
+
+
+@pytest.mark.parametrize("route", ["kontakt", "anmeldung"])
+def test_outage_blocks_both_forms(
+    monkeypatch: pytest.MonkeyPatch, contact_client: tuple[TestClient, AsyncMock, AsyncMock], route: str
+) -> None:
+    client, db, mail = contact_client
+    _mock_siteverify(monkeypatch, httpx.Response(503))
+    response = client.post(
+        f"/public/{route}",
+        json={
+            "anlassid": 1,
+            "name": "Muster",
+            "vorname": "Max",
+            "email": "max@example.com",
+            "betreff": "Frage",
+            "nachricht": "Hallo",
+            "turnstile_token": "test-token",
+        },
+    )
+    assert response.status_code == 503
+    db.get.assert_not_awaited()
     db.add.assert_not_called()
     mail.assert_not_awaited()

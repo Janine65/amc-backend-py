@@ -1,8 +1,9 @@
-"""Server-side Cloudflare Turnstile verification for contact requests."""
+"""Server-side Cloudflare Turnstile verification for public forms."""
 
 from __future__ import annotations
 
 import os
+from typing import Literal
 
 import httpx
 from fastapi import HTTPException
@@ -28,7 +29,7 @@ def get_turnstile_site_key() -> str:
     return _required_env("CLOUDFLARE_TURNSPIKE_SITEKEY")
 
 
-async def verify_turnstile(token: str | None) -> None:
+async def verify_turnstile(token: str | None, *, action: Literal["kontakt", "anmeldung"]) -> None:
     if not token or not token.strip():
         raise HTTPException(status_code=400, detail="Bitte die Sicherheitsprüfung abschliessen.")
 
@@ -57,7 +58,7 @@ async def verify_turnstile(token: str | None) -> None:
     if {"missing-input-secret", "invalid-input-secret", "internal-error"} & set(errors):
         logger.error("Turnstile service or secret configuration error")
         raise HTTPException(status_code=503, detail=UNAVAILABLE)
-    if result["success"] is not True or result.get("action") != "kontakt":
+    if result["success"] is not True or result.get("action") != action:
         raise HTTPException(
             status_code=400,
             detail="Sicherheitsprüfung fehlgeschlagen oder abgelaufen. Bitte erneut versuchen.",

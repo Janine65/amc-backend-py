@@ -35,7 +35,7 @@ from app.schemas.kontakt import KontaktPublicCreate
 from app.schemas.news import NewsPublic
 from app.schemas.public import AgendaPublic, CaptchaPublic, JahrFreigabePublic, MeisterPublic, TurnstilePublic
 from app.schemas.ret_data import RetData
-from app.utils.captcha import create_captcha, verify_captcha
+from app.utils.captcha import create_captcha
 from app.utils.mail import send_mail
 from app.utils.turnstile import get_turnstile_site_key, verify_turnstile
 
@@ -121,8 +121,7 @@ async def create_anmeldung(
         logger.warning("Anmeldung honeypot triggered from %s", request.client.host if request.client else "?")
         return RetData(data=None, message="Anmeldung erhalten")
 
-    if not verify_captcha(body.captcha_token, body.captcha):
-        raise HTTPException(status_code=400, detail="Sicherheitsfrage falsch beantwortet. Bitte erneut versuchen.")
+    await verify_turnstile(body.turnstile_token, action="anmeldung")
 
     anlass = await db.get(Anlaesse, body.anlassid)
     today = datetime.now(UTC).date()
@@ -227,7 +226,7 @@ async def create_kontakt(
         logger.warning("Kontakt honeypot triggered from %s", request.client.host if request.client else "?")
         return RetData(data=None, message="Nachricht erhalten")
 
-    await verify_turnstile(body.turnstile_token)
+    await verify_turnstile(body.turnstile_token, action="kontakt")
 
     now = datetime.now(UTC)
     db.add(

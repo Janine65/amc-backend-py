@@ -40,23 +40,26 @@ Health-/Info-Endpoint: `GET http://localhost:3001/` – Swagger-UI unter `/docs`
 | `SMTP_PWD_JANINEFRANKEN`   | ja\*\*    | SMTP-Passwort der Signatur „JanineFranken“                             |
 | `SMTP_PWD_HANSJOERGDUTLER` | ja\*\*    | SMTP-Passwort der Signatur „HansjoergDutler“                           |
 | `UNSUBSCRIBE_SECRET`       | empfohlen | Secret für signierte One-Click-Abmeldelinks in Massen-E-Mails          |
-| `CLOUDFLARE_TURNSPIKE_SITEKEY` | für Kontaktformular | Öffentlicher Turnstile Site Key |
-| `CLOUDFLARE_TURNSPIKE_SECRET` | für Kontaktformular | Geheimer Turnstile-Schlüssel, nur im Backend |
+| `CLOUDFLARE_TURNSPIKE_SITEKEY` | für öffentliche Formulare | Öffentlicher Turnstile Site Key |
+| `CLOUDFLARE_TURNSPIKE_SECRET` | für öffentliche Formulare | Geheimer Turnstile-Schlüssel, nur im Backend |
 
 \* eines von beiden. \*\* nur für E-Mail-Versand nötig.
 
-## Spam-Schutz im Kontaktformular
+## Spam-Schutz in Kontaktformular und Anlass-Anmeldungen
 
 Die beiden Turnstile-Variablen müssen in der Backend-Laufzeitumgebung gesetzt
 sein (bei Docker in der über `--env-file` geladenen Datei). Die Schreibweise
 `TURNSPIKE` entspricht den bestehenden Variablennamen.
 `GET /public/turnstile` liefert ausschliesslich den öffentlichen Site Key.
-`POST /public/kontakt` verlangt `turnstile_token` und prüft das Token bei
-Cloudflare mit der Aktion `kontakt`, bevor eine Nachricht gespeichert oder
-versendet wird. Fehlende/ungültige Tokens werden abgelehnt; bei einem Ausfall
+`POST /public/kontakt` und `POST /public/anmeldung` verlangen `turnstile_token`
+und prüfen das Token bei Cloudflare mit der jeweiligen Aktion `kontakt` bzw.
+`anmeldung`, bevor etwas gespeichert oder eine E-Mail versendet wird.
+Ein Token für das Kontaktformular gilt nicht für eine Anmeldung und umgekehrt.
+Fehlende/ungültige Tokens werden abgelehnt; bei einem Ausfall
 oder fehlender Konfiguration wird HTTP 503 zurückgegeben, ohne Captcha-Fallback.
-Honeypot und das bestehende Rate-Limit bleiben aktiv. Anlass-Anmeldungen nutzen
-weiterhin die Rechenaufgabe.
+Honeypot und das bestehende Rate-Limit bleiben aktiv. Die Rechenaufgabe wird
+von beiden Formularen nicht mehr verwendet; der bisherige
+`GET /public/captcha`-Endpunkt bleibt aus Kompatibilitätsgründen bestehen.
 
 Backend und Homepage müssen gemeinsam aktualisiert werden. Die Homepage benötigt
 keinen Secret Key und lädt den Site Key serverseitig vom Backend. Im

@@ -67,13 +67,6 @@ def test_public_anmeldung_honeypot(client: TestClient) -> None:
     assert response.status_code == 201, response.text
 
 
-def _solve_captcha(client: TestClient) -> dict[str, str]:
-    """Holt ein Captcha und löst die Rechenaufgabe (z. B. "3 + 4")."""
-    data = client.get("/public/captcha").json()["data"]
-    a, _, b = data["frage"].partition(" + ")
-    return {"captcha": str(int(a) + int(b)), "captcha_token": data["token"]}
-
-
 def test_public_captcha(client: TestClient) -> None:
     response = client.get("/public/captcha")
     assert response.status_code == 200, response.text
@@ -82,7 +75,9 @@ def test_public_captcha(client: TestClient) -> None:
     assert data["token"].count(":") == 2
 
 
-def test_public_anmeldung_unbekannter_anlass(client: TestClient) -> None:
+def test_public_anmeldung_unbekannter_anlass(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    verify = AsyncMock()
+    monkeypatch.setattr("app.routers.public.verify_turnstile", verify)
     response = client.post(
         "/public/anmeldung",
         json={
@@ -90,14 +85,14 @@ def test_public_anmeldung_unbekannter_anlass(client: TestClient) -> None:
             "name": "Muster",
             "vorname": "Max",
             "email": "max@example.com",
-            **_solve_captcha(client),
+            "turnstile_token": "test-token",
         },
     )
     assert response.status_code == 404
+    verify.assert_awaited_once_with("test-token", action="anmeldung")
 
 
-def test_public_anmeldung_falsches_captcha(client: TestClient) -> None:
-    data = client.get("/public/captcha").json()["data"]
+def test_public_anmeldung_ohne_turnstile(client: TestClient) -> None:
     response = client.post(
         "/public/anmeldung",
         json={
@@ -105,8 +100,6 @@ def test_public_anmeldung_falsches_captcha(client: TestClient) -> None:
             "name": "Muster",
             "vorname": "Max",
             "email": "max@example.com",
-            "captcha": "999",
-            "captcha_token": data["token"],
         },
     )
     assert response.status_code == 400
@@ -142,7 +135,7 @@ def test_kontakt_cycle(client: TestClient, auth_headers: dict[str, str], monkeyp
         },
     )
     assert created.status_code == 201, created.text
-    verify.assert_awaited_once_with("test-token")
+    verify.assert_awaited_once_with("test-token", action="kontakt")
 
     rows = client.get("/kontakte", headers=auth_headers).json()["data"]
     entry = next((r for r in rows if r["name"] == "PYTEST_KONTAKT"), None)
@@ -268,8 +261,12 @@ def test_jahrfreigabe_und_public_meister(client: TestClient, auth_headers: dict[
         assert client.get("/public/clubmeister", params={"jahr": "1901"}).status_code == 404
 
 
-def test_anmeldung_kegeln_abgelehnt(client: TestClient, auth_headers: dict[str, str]) -> None:
+def test_anmeldung_kegeln_abgelehnt(
+    client: TestClient, auth_headers: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Kegel-Anlässe benötigen keine Anmeldung → 400."""
+    verify = AsyncMock()
+    monkeypatch.setattr("app.routers.public.verify_turnstile", verify)
     anlass_payload = {
         "datum": (date.today() + timedelta(days=30)).isoformat(),
         "name": "PYTEST_KEGEL_ANLASS",
@@ -292,15 +289,20 @@ def test_anmeldung_kegeln_abgelehnt(client: TestClient, auth_headers: dict[str, 
                 "name": "Muster",
                 "vorname": "Max",
                 "email": "kegel@example.com",
+                "turnstile_token": "test-token",
             },
         )
         assert anmeldung.status_code == 400
+        assert "Kegel-Anlässe" in anmeldung.json()["detail"]
+        verify.assert_awaited_once_with("test-token", action="anmeldung")
     finally:
         client.delete(f"/anlaesse/{anlass_id}", headers=auth_headers)
 
 
-def test_anmeldung_cycle(client: TestClient, auth_headers: dict[str, str]) -> None:
+def test_anmeldung_cycle(client: TestClient, auth_headers: dict[str, str], monkeypatch: pytest.MonkeyPatch) -> None:
     """Temporären Anlass erstellen, öffentlich anmelden, verwalten, aufräumen."""
+    verify = AsyncMock()
+    monkeypatch.setattr("app.routers.public.verify_turnstile", verify)
     anlass_payload = {
         "datum": (date.today() + timedelta(days=30)).isoformat(),
         "name": "PYTEST_HOMEPAGE_ANLASS",
@@ -325,10 +327,11 @@ def test_anmeldung_cycle(client: TestClient, auth_headers: dict[str, str]) -> No
                 "vorname": "Max",
                 "email": "pytest@example.com",
                 "bemerkung": "Testanmeldung",
-                **_solve_captcha(client),
+                "turnstile_token": "test-token",
             },
         )
         assert anmeldung.status_code == 201, anmeldung.text
+        verify.assert_awaited_once_with("test-token", action="anmeldung")
 
         # Doppelte Anmeldung → 409
         doppelt = client.post(
@@ -338,7 +341,7 @@ def test_anmeldung_cycle(client: TestClient, auth_headers: dict[str, str]) -> No
                 "name": "Muster",
                 "vorname": "Max",
                 "email": "pytest@example.com",
-                **_solve_captcha(client),
+                "turnstile_token": "second-test-token",
             },
         )
         assert doppelt.status_code == 409
