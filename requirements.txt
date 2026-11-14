@@ -44,4 +44,5 @@ python-dotenv==1.2.3
 # Misc
 itsdangerous==2.2.0
 httpx==0.28.1
+maxminddb==3.2.0
 

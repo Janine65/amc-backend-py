@@ -68,6 +68,26 @@ freigegeben sein (für lokale Tests gegebenenfalls auch `localhost`).
 
 ## Volumes
 
+### Besucherstatistik
+
+Vor dem Start `alembic upgrade head` ausführen und Backend, Homepage und
+Verwaltungs-Frontend gemeinsam aktualisieren.
+`ANALYTICS_SECRET` (zufällig, mindestens 32 Zeichen) muss in Backend und
+Homepage identisch gesetzt werden. Ohne Schlüssel bleibt nur der alte
+Gesamtzähler aktiv. Der Schlüssel darf nicht ins Verwaltungs-Frontend gelangen.
+
+Für Länder eine lokale Country-MMDB-Datei read-only ins Backend einbinden,
+z. B. `-v /volume1/geoip/GeoLite2-Country.mmdb:/geoip/country.mmdb:ro`, und
+`GEOIP_COUNTRY_DB=/geoip/country.mmdb` setzen. Die Datei separat bereitstellen
+und regelmäßig aktualisieren. Ohne Datei: Land „Unbekannt“; keine externen
+GeoIP-Anfragen. Ein ungültiger konfigurierter Pfad verhindert den Start.
+
+Ein täglicher Löschlauf entfernt Einzelbesuche samt Seitenaufrufen nach
+365 Tagen, erstmalig beim Start (auch bei deaktivierter neuer Erfassung).
+Die Statistik ist für eingeloggte Rollen `user`/`admin` sichtbar, nicht öffentlich.
+Erfassung ohne Einwilligungsdialog und Infrastruktur-Logs vor dem Einsatz
+rechtlich prüfen. Details und Messgrenzen: [README](./README.md#besucherstatistik).
+
 | Pfad im Container        | Zweck                                       |
 | ------------------------ | ------------------------------------------- |
 | `/usr/src/app/documents` | erzeugte Dokumente (QR-Rechnungen, Exporte) |

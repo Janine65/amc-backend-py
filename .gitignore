@@ -169,3 +169,4 @@ logs/app.log*
 
 .env.test
 .env.prod
+logs/GeoLite2-Country.mmdb

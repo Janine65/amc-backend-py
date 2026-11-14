@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from importlib.metadata import distributions
 
 import secure
@@ -35,6 +36,7 @@ from app.routers import (
     anmeldungen,
     auth,
     bericht,
+    besucher,
     budget,
     clubmeister,
     fiscalyear,
@@ -54,6 +56,7 @@ from app.routers import (
 from app.routers import (
     file as files_router,
 )
+from app.utils.besucher import close_geoip, open_geoip, retention_worker
 
 # Logging so früh wie möglich konfigurieren – noch vor App-Erzeugung,
 # damit auch Lifespan-/Middleware-Initialisierung die Konfiguration nutzt.
@@ -66,8 +69,22 @@ async def lifespan(_: FastAPI) -> AsyncGenerator[None]:
     """Load runtime parameters from the database before serving traffic."""
     logger.info("Starting %s v%s", PACKAGE_NAME, PACKAGE_VERSION)
     await load_params()
+    analytics_key = os.environ.get("ANALYTICS_SECRET", "")
+    if analytics_key and len(analytics_key) < 32:
+        raise RuntimeError("ANALYTICS_SECRET muss mindestens 32 Zeichen enthalten")
+    if analytics_key:
+        open_geoip()
+    else:
+        logger.warning("ANALYTICS_SECRET fehlt: detaillierte Besuchererfassung ist deaktiviert")
+    cleanup = asyncio.create_task(retention_worker())
     logger.info("Application startup complete")
-    yield
+    try:
+        yield
+    finally:
+        cleanup.cancel()
+        with suppress(asyncio.CancelledError):
+            await cleanup
+        close_geoip()
     logger.info("Application shutdown")
 
 
@@ -176,6 +193,7 @@ app.include_router(anmeldungen.router)
 app.include_router(kontakte.router)
 app.include_router(jahr_freigabe.router)
 app.include_router(public.router)
+app.include_router(besucher.router)
 
 
 # ---------------------------------------------------------------------------

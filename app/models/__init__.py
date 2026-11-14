@@ -13,7 +13,7 @@ from app.models.anlaesse import Anlaesse
 from app.models.anlass_anmeldung import AnlassAnmeldung
 from app.models.base import Base
 from app.models.bericht import Bericht
-from app.models.besucher import BesucherZaehler
+from app.models.besucher import BesucherSeite, BesucherSitzung, BesucherZaehler
 from app.models.budget import Budget
 from app.models.clubmeister import Clubmeister
 from app.models.fiscalyear import Fiscalyear
@@ -37,6 +37,8 @@ __all__ = [
     "Anlaesse",
     "AnlassAnmeldung",
     "Bericht",
+    "BesucherSeite",
+    "BesucherSitzung",
     "Budget",
     "Clubmeister",
     "Fiscalyear",
