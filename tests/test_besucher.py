@@ -1,5 +1,6 @@
 """Statistiktests verwenden ausschliesslich ein eigenes temporaeres PostgreSQL-Schema."""
 
+import logging
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -72,6 +73,38 @@ def test_coarse_paths_agents_and_local_geoip(monkeypatch):
     assert utils.country_for_ip("192.168.1.1") is None
     assert utils.country_for_ip("invalid") is None
     geoip.get.assert_called_once_with("8.8.8.8")
+
+
+def test_geoip_startup_reports_loaded_database_and_rejects_asn(monkeypatch, caplog):
+    reader = Mock()
+    reader.metadata.return_value.database_type = "GeoLite2-Country"
+    monkeypatch.setenv("GEOIP_COUNTRY_DB", "/geoip/country.mmdb")
+    monkeypatch.setattr(utils.maxminddb, "open_database", Mock(return_value=reader))
+    monkeypatch.setattr(utils, "_geoip", None)
+    with caplog.at_level(logging.INFO, logger=utils.__name__):
+        utils.open_geoip()
+    assert utils._geoip is reader
+    assert "GeoIP-Laenderdatenbank geladen" in caplog.text
+    utils.close_geoip()
+    reader.close.assert_called_once()
+    reader.reset_mock()
+    reader.metadata.return_value.database_type = "GeoLite2-ASN"
+    with pytest.raises(RuntimeError, match="GeoLite2-ASN"):
+        utils.open_geoip()
+    reader.close.assert_called_once()
+    assert utils._geoip is None
+
+
+def test_geoip_logs_private_addresses_once_without_disclosing_them(monkeypatch, caplog):
+    reader = Mock()
+    monkeypatch.setattr(utils, "_geoip", reader)
+    monkeypatch.setattr(utils, "_geoip_notices", set())
+    with caplog.at_level(logging.INFO, logger=utils.__name__):
+        assert utils.country_for_ip("127.0.0.1") is None
+        assert utils.country_for_ip("192.168.1.1") is None
+    assert caplog.text.count("lokale/private") == 1
+    assert "127.0.0.1" not in caplog.text and "192.168.1.1" not in caplog.text
+    reader.get.assert_not_called()
 
 
 def test_collection_requires_shared_secret(monkeypatch):

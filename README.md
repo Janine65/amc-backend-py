@@ -133,6 +133,28 @@ Erfassung ohne Einwilligungsdialog wurde gewünscht; Rechtsgrundlage,
 Informationspflichten und bestehende Infrastruktur-/Zugriffslogs müssen
 vor dem produktiven Einsatz separat geprüft werden.
 
+### Land bleibt unbekannt
+
+Der Speicherort allein genügt nicht: `GEOIP_COUNTRY_DB` muss auf die Datei
+im **laufenden Backend** zeigen. Bei lokalem Python-Start etwa
+`logs/GeoLite2-Country.mmdb` (Start aus dem Backend-Verzeichnis), im Test-Container
+mit dem Logs-Mount `/usr/src/app/logs/GeoLite2-Country.mmdb`.
+Ein Pfad im Container ist außerhalb des Containers normalerweise nicht vorhanden.
+
+Beim Start protokolliert das Backend die erfolgreich geladene Datei und ihren
+Datenbanktyp. Eine ASN-Datei wird mit einem expliziten Startfehler abgelehnt.
+Eine erfolgreiche Länderermittlung setzt eine öffentliche Besucher-IP voraus.
+`localhost`, private LAN-Adressen und Docker-interne Adressen liefern
+erwartungsgemäß „Unbekannt“, keinen Backend-Fehler. Gründe für fehlende
+Länderzuordnungen werden einmal pro Grund und Backend-Lauf als INFO gemeldet,
+ohne die Besucher-IP in diese Meldungen aufzunehmen.
+
+Wenn externe Besuche ebenfalls unbekannt bleiben, prüfen, ob die Homepage
+die echte öffentliche Besucher-IP erhält. `ANALYTICS_TRUST_PROXY=true`
+nur bei einer überprüften, vertrauenswürdigen Proxy-Konfiguration setzen,
+nicht als Abkürzung für lokale Tests. Bestehende Sitzungen behalten ihr beim
+ersten Aufruf ermitteltes Land; nach Korrekturen mit einer neuen Sitzung testen.
+
 Validierung: `python -m pytest tests/test_besucher.py`.
 Die Datenbanktests erstellen und entfernen ausschließlich ein eigenes,
 zufällig benanntes Testschema in der konfigurierten PostgreSQL-Datenbank.

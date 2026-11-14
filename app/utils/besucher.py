@@ -19,6 +19,7 @@ from app.models.besucher import BesucherSitzung
 
 logger = get_logger(__name__)
 _geoip: maxminddb.Reader | None = None
+_geoip_notices: set[str] = set()
 RETENTION_DAYS = 365
 SESSION_TIMEOUT = timedelta(minutes=30)
 BOT_RE = re.compile(r"bot|crawl|spider|slurp|preview|healthcheck|^node$|^$", re.I)
@@ -89,9 +90,18 @@ def agent_details(agent: str) -> tuple[str, str]:
 
 def open_geoip() -> None:
     global _geoip
+    _geoip_notices.clear()
     path = os.environ.get("GEOIP_COUNTRY_DB")
     if path:
-        _geoip = maxminddb.open_database(path)
+        reader = maxminddb.open_database(path)
+        database_type = reader.metadata().database_type
+        if not database_type.endswith("-Country"):
+            reader.close()
+            raise RuntimeError(
+                f"GEOIP_COUNTRY_DB verweist auf {database_type}; eine GeoIP-/GeoLite2-Country-MMDB ist erforderlich."
+            )
+        _geoip = reader
+        logger.info("GeoIP-Laenderdatenbank geladen: %s (%s)", path, database_type)
     else:
         logger.warning("GEOIP_COUNTRY_DB fehlt: Besucherland wird als unbekannt erfasst")
 
@@ -101,10 +111,21 @@ def close_geoip() -> None:
     if _geoip is not None:
         _geoip.close()
         _geoip = None
+    _geoip_notices.clear()
+
+
+def _geoip_notice(message: str) -> None:
+    if message not in _geoip_notices:
+        _geoip_notices.add(message)
+        logger.info(message)
 
 
 def country_for_ip(value: str | None) -> str | None:
-    if not value or _geoip is None:
+    if _geoip is None:
+        _geoip_notice("GeoIP: keine Laenderdatenbank geladen; Besucherland bleibt unbekannt.")
+        return None
+    if not value:
+        _geoip_notice("GeoIP: keine Besucher-IP uebermittelt; Besucherland bleibt unbekannt.")
         return None
     try:
         address = ipaddress.ip_address(value)
@@ -112,15 +133,24 @@ def country_for_ip(value: str | None) -> str | None:
         logger.warning("Ungueltige Statistik-IP verworfen")
         return None
     if not address.is_global:
+        _geoip_notice(
+            "GeoIP: lokale/private oder andere nichtoeffentliche Besucher-IP; kein Land bestimmbar. "
+            "Bei localhost-/Docker-Zugriffen ist dies erwartbar. Fuer externe Besucher die IP-Weitergabe pruefen."
+        )
         return None
     result = _geoip.get(str(address))
     if not isinstance(result, dict):
+        _geoip_notice("GeoIP: oeffentliche Besucher-IP ist nicht in der Datenbank enthalten; Land bleibt unbekannt.")
         return None
     country = result.get("country")
     if not isinstance(country, dict):
+        _geoip_notice("GeoIP: Datensatz enthaelt keine geografische Laenderzuordnung; Land bleibt unbekannt.")
         return None
     code = country.get("iso_code")
-    return code if isinstance(code, str) and re.fullmatch(r"[A-Z]{2}", code) else None
+    if not isinstance(code, str) or not re.fullmatch(r"[A-Z]{2}", code):
+        _geoip_notice("GeoIP: Datensatz enthaelt keinen gueltigen Laendercode; Land bleibt unbekannt.")
+        return None
+    return code
 
 
 async def purge_visits(db: AsyncSession, now: datetime) -> None:
