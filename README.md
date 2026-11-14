@@ -7,7 +7,7 @@ Python / FastAPI für die AMC Internal Application.
 - **FastAPI** + Uvicorn
 - **SQLAlchemy 2.0 (async, asyncpg)** + Alembic
 - **Pydantic v2** + `pydantic-settings`
-- **python-jose** für JWT, **pwdlib[bcrypt]** für Passwort-Hashing
+- **PyJWT** für JWT, **pwdlib[bcrypt]** für Passwort-Hashing
 - **openpyxl** (Excel), **reportlab** (PDF), **qrbill** (Swiss QR-Bill)
 - **fastapi-mail** für SMTP
 
@@ -22,6 +22,17 @@ python3.13 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements-dev.txt
 cp .env.example .env  # Werte ausfüllen
+```
+
+Bei bestehenden Umgebungen nach dem Update `pip uninstall python-jose ecdsa` ausführen.
+Diese nicht mehr benötigten Pakete werden durch `pip install -r requirements-dev.txt`
+nicht automatisch entfernt. Bestehende HS256-Tokens bleiben mit demselben
+`JWT_SECRET` gültig.
+
+Die JWT-Kompatibilitätstests benötigen keine Datenbankverbindung:
+
+```bash
+python -m pytest tests/test_auth.py -k jwt
 ```
 
 ## Starten

@@ -6,7 +6,8 @@ import os
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from jose import JWTError, jwt
+import jwt
+from jwt import PyJWTError
 from pwdlib import PasswordHash
 from pwdlib.hashers.bcrypt import BcryptHasher
 
@@ -62,5 +63,5 @@ def create_access_token(payload: dict[str, Any]) -> str:
 def decode_access_token(token: str) -> dict[str, Any]:
     try:
         return jwt.decode(token, get_jwt_secret(), algorithms=[get_jwt_algorithm()])
-    except JWTError as exc:  # pragma: no cover
+    except PyJWTError as exc:
         raise ValueError(str(exc)) from exc

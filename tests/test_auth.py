@@ -2,7 +2,63 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+from typing import Any
+
+import jwt
+import pytest
 from fastapi.testclient import TestClient
+
+from app.core.security import DEV_FALLBACK_SECRET, create_access_token, decode_access_token
+
+
+@pytest.fixture
+def jwt_config(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("JWT_SECRET", DEV_FALLBACK_SECRET)
+    monkeypatch.setenv("JWT_ALGORITHM", "HS256")
+    monkeypatch.setenv("JWT_EXPIRES_IN", "60")
+
+
+def test_jwt_legacy_token_compatibility(jwt_config: None) -> None:
+    # Generated with python-jose 3.5.0 and the public development key.
+    token = (
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
+        "eyJ1c2VySWQiOjQyLCJleHAiOjQxMDI0NDQ4MDB9."
+        "b9q8RU8mTKq5O4_679gdJ7AVPN7jBMPgk5PwVuWTVvA"
+    )
+    assert decode_access_token(token) == {"userId": 42, "exp": 4102444800}
+
+
+def test_jwt_create_and_decode(jwt_config: None) -> None:
+    payload = {"userId": 42}
+    before = int(datetime.now(UTC).timestamp())
+    token = create_access_token(payload)
+    claims = jwt.decode(token, DEV_FALLBACK_SECRET, algorithms=["HS256"])
+
+    assert decode_access_token(token) == claims
+    assert claims["userId"] == 42
+    assert before + 60 <= claims["exp"] <= int(datetime.now(UTC).timestamp()) + 60
+    assert payload == {"userId": 42}
+
+
+@pytest.mark.parametrize(
+    ("payload", "key", "algorithm"),
+    [
+        ({"userId": 42, "exp": 0}, DEV_FALLBACK_SECRET, "HS256"),
+        ({"userId": 42}, "another-test-secret-that-is-at-least-32-characters", "HS256"),
+        ({"userId": 42}, DEV_FALLBACK_SECRET, "HS384"),
+    ],
+    ids=["expired", "invalid-signature", "unexpected-algorithm"],
+)
+def test_jwt_rejects_invalid_tokens(jwt_config: None, payload: dict[str, Any], key: str, algorithm: str) -> None:
+    token = jwt.encode(payload, key, algorithm=algorithm)
+    with pytest.raises(ValueError):
+        decode_access_token(token)
+
+
+def test_jwt_rejects_malformed_token(jwt_config: None) -> None:
+    with pytest.raises(ValueError):
+        decode_access_token("not-a-jwt")
 
 
 def test_health(client: TestClient) -> None:
